@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="ko"><head>
+{% include "combos/_base_head.html" %}
+<title>Horizontal Tree</title>
+<style>
+  body { background:#fafbfc; }
+  .hv-wrap { padding:20px; }
+  #h-tree { width:100%; height:calc(100vh - 100px); background:#fff; border-radius:14px; box-shadow:0 4px 14px rgba(0,0,0,0.05); }
+  .node-root rect { fill:url(#root-grad); stroke:#1e293b; stroke-width:2; }
+  .node-page rect { stroke-width:2; }
+  .node-dec rect { stroke-width:1.5; rx:6; }
+  .link { fill:none; stroke-width:1.8; opacity:0.4; }
+  text { font-family:'Pretendard',-apple-system,sans-serif; pointer-events:none; }
+  .tooltip {
+    position:absolute; background:#1e293b; color:#fff; padding:8px 12px;
+    border-radius:6px; font-size:0.78rem; pointer-events:none; display:none; z-index:50;
+    max-width:300px; line-height:1.4;
+  }
+</style>
+</head><body>
+{% include "tree_vis/_nav.html" %}
+<div class="hv-wrap">
+  <svg id="h-tree"></svg>
+</div>
+<div class="tooltip" id="tt"></div>
+
+<script>
+const data = {{ h|tojson }};
+
+const svg = d3.select("#h-tree");
+const rect = svg.node().getBoundingClientRect();
+const W = rect.width, H = rect.height;
+svg.attr("viewBox", `0 0 ${W} ${H}`);
+
+// gradient
+const defs = svg.append("defs");
+const grad = defs.append("linearGradient").attr("id","root-grad").attr("x1","0").attr("x2","1");
+grad.append("stop").attr("offset","0%").attr("stop-color","#1e293b");
+grad.append("stop").attr("offset","100%").attr("stop-color","#475569");
+
+const g = svg.append("g").attr("transform","translate(60,30)");
+svg.call(d3.zoom().on("zoom", e => g.attr("transform", e.transform)));
+
+const root = d3.hierarchy(data);
+const tree = d3.tree().size([H - 60, W - 280]);
+tree(root);
+
+// links (curves)
+const link = g.selectAll(".link").data(root.links()).join("path")
+  .attr("class","link")
+  .attr("stroke", d => d.target.data.color || (d.target.data.impl === 'shipped' ? '#16a34a' : d.target.data.impl === 'in_progress' ? '#f59e0b' : '#cbd5e1'))
+  .attr("d", d3.linkHorizontal().x(d=>d.y).y(d=>d.x));
+
+// nodes
+const node = g.selectAll(".node").data(root.descendants()).join("g")
+  .attr("class", d => "node node-" + d.data.type)
+  .attr("transform", d => `translate(${d.y},${d.x})`)
+  .on("mousemove", (e,d) => {
+    const tt = document.getElementById("tt");
+    let html = `<b>${d.data.name}</b>`;
+    if (d.data.type === "page") html += `<br>📂 결정 ${d.data.total} · 완료 ${d.data.shipped} (${d.data.pct}%)`;
+    if (d.data.type === "decision") {
+      html += `<br>📅 ${d.data.date || '-'} · ${d.data.impl}`;
+      if (d.data.full_text) html += `<br><i>${d.data.full_text.slice(0,120)}</i>`;
+    }
+    tt.innerHTML = html;
+    tt.style.display = "block";
+    tt.style.left = (e.pageX + 12) + "px";
+    tt.style.top = (e.pageY - 10) + "px";
+  })
+  .on("mouseleave", () => document.getElementById("tt").style.display = "none");
+
+// 각 타입별 박스 크기 다르게
+node.each(function(d){
+  const sel = d3.select(this);
+  if (d.data.type === "root") {
+    sel.append("rect").attr("x",-50).attr("y",-22).attr("width",100).attr("height",44).attr("rx",10);
+    sel.append("text").text("🧠 thinking").attr("text-anchor","middle").attr("dy",5).attr("fill","#fff").attr("font-weight",800).attr("font-size","12px");
+  } else if (d.data.type === "page") {
+    sel.append("rect").attr("x",-60).attr("y",-18).attr("width",120).attr("height",36).attr("rx",8)
+      .attr("fill","#fff").attr("stroke", d.data.color);
+    sel.append("text").text("📂 " + d.data.name.slice(0,12)).attr("text-anchor","middle").attr("dy",-1).attr("fill",d.data.color).attr("font-weight",800).attr("font-size","11px");
+    sel.append("text").text(d.data.pct + "%").attr("text-anchor","middle").attr("dy",12).attr("fill","#64748b").attr("font-size","9px");
+  } else {  // decision
+    const col = d.data.impl === 'shipped' ? '#16a34a' : d.data.impl === 'in_progress' ? '#f59e0b' : '#94a3b8';
+    const bg  = d.data.impl === 'shipped' ? '#dcfce7' : d.data.impl === 'in_progress' ? '#fef3c7' : '#f1f5f9';
+    sel.append("rect").attr("x",-110).attr("y",-12).attr("width",220).attr("height",24)
+      .attr("rx",5).attr("fill",bg).attr("stroke",col);
+    const icn = d.data.impl === 'shipped' ? '✅' : d.data.impl === 'in_progress' ? '⏳' : '📋';
+    sel.append("text").text(`${icn} ${d.data.name.slice(0,28)}`).attr("text-anchor","middle").attr("dy",4).attr("fill","#1e293b").attr("font-size","10px");
+  }
+});
+</script>
+</body></html>

@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="ko"><head>
+{% include "combos/_base_head.html" %}
+<title>Archive · 회고 모드</title>
+<style>
+  .archive-hero { background:linear-gradient(135deg,#fef3c7,#fff); border:1px solid #fde68a;
+                  border-radius:14px; padding:18px 22px; margin-bottom:14px; }
+  .archive-hero h2 { margin:0; color:#92400e; font-size:1.1rem; }
+  .archive-hero p { margin:5px 0 0; color:#78350f; font-size:0.86rem; }
+  .filter-bar { display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap; }
+  .filter-bar span { background:#fff; padding:6px 14px; border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,0.04);
+                     font-size:0.82rem; font-weight:600; color:#475569; cursor:pointer; }
+  .filter-bar span.on { background:var(--think); color:#fff; }
+  .stale-box { background:#fff7ed; border:1px solid #fed7aa; border-radius:12px; padding:14px 18px; margin-top:14px; }
+  .stale-box h3 { margin:0 0 8px; color:#c2410c; font-size:0.95rem; }
+  .stale-pill { display:inline-block; background:#fff; border:1px solid #fed7aa; color:#c2410c;
+                padding:6px 12px; border-radius:8px; font-size:0.8rem; margin:4px 4px 0 0; }
+</style>
+</head><body>
+{% include "combos/_nav.html" %}
+<div class="cb-wrap">
+
+  <div class="archive-hero">
+    <h2>📜 회고 모드</h2>
+    <p>지난 180일 흐름과 변화를 다른 각도로. 결정 폐기 분석, 비활성 페이지 경고, 트렌드 비교.</p>
+  </div>
+
+  <div class="cb-card">
+    <h3>🔥 180일 활동 (hero) <span class="src">#2</span></h3>
+    {% set uid = "c12h" %}{% include "partials/heat_strip.html" %}
+    <div class="cb-2col" style="margin-top:14px;">
+      <div>
+        <h4 style="margin:0 0 8px;color:var(--muted);font-size:0.78rem;text-transform:uppercase;">🔥 최근 7일</h4>
+        {% set period = "7d" %}{% include "partials/hot_topics.html" %}
+      </div>
+      <div>
+        <h4 style="margin:0 0 8px;color:var(--muted);font-size:0.78rem;text-transform:uppercase;">📈 최근 30일</h4>
+        {% set period = "30d" %}{% include "partials/hot_topics.html" %}
+      </div>
+    </div>
+  </div>
+
+  <div class="cb-2col" style="margin-top:14px;">
+    <div class="cb-card">
+      <h3>💭 집중도 변화 <span class="src">#6</span></h3>
+      {% include "partials/focus_mini.html" %}
+    </div>
+    <div class="cb-card">
+      <h3>📊 진행도 monthly <span class="src">#5</span></h3>
+      {% include "partials/pipeline_bars.html" %}
+    </div>
+  </div>
+
+  <div class="cb-card" style="margin-top:14px;">
+    <h3>🧭 결정 흐름 (필터 강조) <span class="src">#3</span></h3>
+    <div class="filter-bar">
+      <span class="on">전체 {{ data.decisions_all|length }}</span>
+      <span>유효만 {{ data.decisions_all|rejectattr('is_dropped')|list|length }}</span>
+      <span>폐기만 {{ data.decisions_all|selectattr('is_dropped')|list|length }}</span>
+      <span style="margin-left:auto;background:#f1f5f9;cursor:default;">폐기율 {{ ((data.decisions_all|selectattr('is_dropped')|list|length / data.decisions_all|length * 100) if data.decisions_all else 0)|round(1) }}%</span>
+    </div>
+    {% set limit = 20 %}{% include "partials/river_list.html" %}
+  </div>
+
+  <div class="cb-2col" style="margin-top:14px;">
+    <div class="cb-card">
+      <h3>📂 폴더 활력 + 비활성 경고 <span class="src">#4</span></h3>
+      {% include "partials/tree_list.html" %}
+      {% set stale = [] %}
+      {% for cat in data.tree %}{% for p in cat.pages %}{% if p.days_idle > 14 %}{% set _ = stale.append(p) %}{% endif %}{% endfor %}{% endfor %}
+      {% if stale %}
+        <div class="stale-box">
+          <h3>⚠ 비활성 {{ stale|length }} 페이지</h3>
+          {% for p in stale %}<span class="stale-pill">{{ p.title }} · {{ p.days_idle }}일</span>{% endfor %}
+        </div>
+      {% endif %}
+    </div>
+    <div class="cb-card">
+      <h3>🌐 관계망 스냅샷 <span class="src">#1</span></h3>
+      {% set uid = "c12g" %}{% include "partials/graph_mini.html" %}
+    </div>
+  </div>
+</div>
+</body></html>

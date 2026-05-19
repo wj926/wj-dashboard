@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>wj dashboard</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}?v=16">
+</head>
+<body>
+<div class="wrap">
+
+  <!-- top bar -->
+  <div class="topbar">
+    <span class="brand">wj<span class="dot">.</span></span>
+    {% include "_tabs.html" %}
+    <div class="quick">
+      <input id="quick-input" placeholder="할 일 한 줄 + Enter (예: 도서관 내일, 5/22 회의 준비)" />
+      <button id="quick-add">추가</button>
+    </div>
+    <div class="filters" id="filter-bar">
+      <span class="f on" data-filter="all">전체</span>
+      <span class="f" data-filter="today">오늘</span>
+      <span class="f" data-filter="week">이번주</span>
+    </div>
+    <span class="topright"><span id="sync-state" class="sync-state">sync …</span></span>
+  </div>
+
+  <!-- bento grid (재배치) -->
+  <div class="bento">
+
+    <!-- 캘린더 (좌측 큰 영역) -->
+    <div class="tile cal-tile">
+      <div class="cal-head">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <a class="cal-nav-btn" href="?ym={{ cal_prev_ym }}" title="이전 달">◀</a>
+          <h2>📅 {{ cal_year }}년 {{ cal_month }}월</h2>
+          <a class="cal-nav-btn" href="?ym={{ cal_next_ym }}" title="다음 달">▶</a>
+          {% if not is_current_month %}<a class="cal-today-btn" href="/" title="오늘로">오늘</a>{% endif %}
+        </div>
+        <div class="legend">
+          {% for p in projects[:4] %}
+            <span class="lr"><span class="dot" style="background:{{ p.color.bg }};border:1px solid {{ p.color.border }};"></span>{{ p.title.split(' ')[0]|truncate(6, True, '') }}</span>
+          {% endfor %}
+          <span class="lr"><span class="dot" style="background:#f1f5f9;border:1px solid #cbd5e1;"></span>Inbox</span>
+          <span class="lr"><span class="dot" style="background:var(--overdue);width:3px;height:14px;border-radius:1px;"></span>임박 (좌측 보더)</span>
+        </div>
+      </div>
+      <div class="cal">
+        <div class="h sun">일</div><div class="h">월</div><div class="h">화</div><div class="h">수</div><div class="h">목</div><div class="h">금</div><div class="h sat">토</div>
+        {% for week in cal_grid %}
+          {% for cell in week %}
+            {% if not cell.in_month %}
+              <div class="c empty"></div>
+            {% else %}
+              <div class="c{% if cell.is_today %} today{% elif cell.is_past %} past{% endif %}{% if cell.urgency == 'overdue' %} has-overdue{% elif cell.urgency == 'urgent' %} has-urgent{% endif %}" data-iso="{{ cell.date_iso }}">
+                <div class="d-row">
+                  <span class="d{% if cell.is_sun %} sun{% elif cell.is_sat %} sat{% endif %}">{{ cell.day }}</span>
+                  {% if cell.urgency in ['overdue','urgent'] %}<span class="urg-dot {{ cell.urgency }}"></span>{% endif %}
+                </div>
+                {% if cell.tasks_view %}
+                  <div class="cell-tasks" title="{% for t in cell.tasks_view %}{{ t.title }}{% if not loop.last %} · {% endif %}{% endfor %}">
+                    {% for t in cell.tasks_view[:2] %}
+                      <div class="cell-title" draggable="true" data-task-id="{{ t.id }}" style="background:{{ t.color.bg }};color:{{ t.color.fg }};">{{ t.title }}</div>
+                    {% endfor %}
+                    {% if cell.count > 2 %}<div class="cell-more">+{{ cell.count - 2 }}건 더</div>{% endif %}
+                  </div>
+                {% endif %}
+              </div>
+            {% endif %}
+          {% endfor %}
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Inbox (캘린더 옆, 위) -->
+    <div class="tile inbox-tile">
+      <h3>📥 Inbox <span class="cnt">{{ inbox_tasks|length }}</span></h3>
+      {% set overdue_inbox = inbox_tasks|selectattr('urgency','equalto','overdue')|list %}
+      {% if overdue_inbox %}
+        <div class="overdue-banner">⚠ 지난 마감 {{ overdue_inbox|length }}건</div>
+      {% endif %}
+      {% for t in inbox_tasks %}
+        <div class="item task-item{% if t.urgency == 'overdue' %} overdue-row{% endif %}{% if t.status == 'done' %} is-done{% endif %}" draggable="true" data-task-id="{{ t.id }}" data-task-status="{{ t.status }}">
+          <input type="checkbox" class="task-check" data-task-id="{{ t.id }}" {% if t.status == 'done' %}checked{% endif %} />
+          <span class="dday {{ t.urgency }}">
+            {% if t.d_minus is none %}—{% elif t.d_minus == 0 %}D-0{% elif t.d_minus > 0 %}D-{{ t.d_minus }}{% else %}D+{{ -t.d_minus }}{% endif %}
+          </span>
+          <span class="t">{{ t.title }}</span>
+        </div>
+      {% else %}
+        <p style="color:var(--muted);font-size:0.82rem;">비어있음</p>
+      {% endfor %}
+    </div>
+
+    <!-- 오늘 마감 (Inbox 아래로) -->
+    {% if urgent_today %}
+    <div class="tile today-tile has-urgent" data-open-day="{{ today_iso }}" style="cursor:pointer;" title="클릭 → 오늘 task 목록·수정">
+      <h3>🔥 오늘 마감 <span class="cnt">D-0</span></h3>
+      <div style="display:flex;align-items:flex-start;gap:8px;margin-top:5px;">
+        <input type="checkbox" class="task-check" data-task-id="{{ urgent_today.id }}" />
+        <div style="flex:1;">
+          <div class="title">{{ urgent_today.title }}</div>
+          {% if urgent_today.note %}<div class="note">{{ urgent_today.note }}</div>{% endif %}
+        </div>
+      </div>
+    </div>
+    {% else %}
+    <div class="tile today-tile no-urgent">
+      <h3>✓ 오늘 마감 없음</h3>
+      <div class="title">한숨 돌리는 날</div>
+    </div>
+    {% endif %}
+
+    <!-- 통계 (작게) -->
+    <div class="tile stats-tile">
+      <h3>요약</h3>
+      <div class="stats-mini">
+        {% if stats.overdue_count %}
+        <div class="stat-mini overdue"><div class="n">{{ stats.overdue_count }}</div><div class="l">지난</div></div>
+        {% else %}
+        <div class="stat-mini{% if stats.today_count %} urgent{% endif %}"><div class="n">{{ stats.today_count }}</div><div class="l">오늘</div></div>
+        {% endif %}
+        <div class="stat-mini"><div class="n">{{ stats.month_count }}</div><div class="l">이번달</div></div>
+        <div class="stat-mini"><div class="n">{{ stats.project_count }}</div><div class="l">프로젝트</div></div>
+        <div class="stat-mini someday"><div class="n">{{ stats.someday_count }}</div><div class="l">언젠가</div></div>
+      </div>
+    </div>
+
+    <!-- 언젠가 (재디자인) -->
+    <div class="tile someday-tile">
+      <h3>💭 언젠가 <span class="cnt">총 {{ stats.someday_count }}</span></h3>
+      {% for g in someday_groups %}
+        <div class="someday-card" data-modal="sd-{{ loop.index }}">
+          <div class="icon">{{ g.count }}</div>
+          <div class="body">
+            <div class="name">
+              {{ g.name }}
+              {% if g.src_thinking %}<span class="src-tag">💭</span>{% endif %}
+            </div>
+            <div class="preview">{% for t in g.tasks[:3] %}{{ t.title }}{% if not loop.last %} · {% endif %}{% endfor %}{% if g.count > 3 %} · 외 {{ g.count - 3 }}건{% endif %}</div>
+          </div>
+          <div class="arr">▶</div>
+        </div>
+      {% else %}
+        <p style="color:var(--muted);font-size:0.82rem;">마감 없는 task 가 없음</p>
+      {% endfor %}
+    </div>
+
+    <!-- 활성 프로젝트 (전체 폭) -->
+    <div class="tile proj-tile-w">
+      <h3>🎯 활성 프로젝트 <span class="cnt">{{ projects|length }}</span></h3>
+      <div class="proj-grid">
+        {% for p in projects %}
+          <div class="proj-tile{% if p.nearest_urgency in ['urgent', 'overdue'] %} urgent{% endif %}" data-project-id="{{ p.id }}">
+            <div class="pname">{{ p.title }}</div>
+            <div class="pmeta">
+              {% if p.tasks %}{{ p.tasks|length }} sub-task{% else %}sub-task 없음{% endif %}
+              {% if p.due_date %} · 마감 {{ p.due_date.strftime("%-m/%-d") }}{% endif %}
+              {% if p.source_thinking %} · 💭 thinking{% endif %}
+            </div>
+            <div class="pbar"><i style="width:{{ p.progress_pct }}%"></i></div>
+            <div class="pstat">
+              <div class="ptags">
+                {% for tag in p.tags or [] %}
+                  <span class="tag{% if tag == '시스템' %} sys{% endif %}">{{ tag }}</span>
+                {% endfor %}
+              </div>
+              <span{% if p.nearest_urgency in ['urgent', 'overdue'] %} style="color:var(--p0);font-weight:700;"{% elif p.nearest_urgency == 'soon' %} style="color:var(--p1);font-weight:700;"{% endif %}>
+                {% if p.nearest_due %}{{ p.nearest_due.strftime("%-m/%-d") }} · D-{{ p.nearest_d_minus }}{% else %}—{% endif %}
+              </span>
+            </div>
+          </div>
+        {% else %}
+          <p style="color:var(--muted);font-size:0.84rem;">활성 프로젝트가 없음</p>
+        {% endfor %}
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- 캘린더 날짜 모달 -->
+<div class="overlay" id="ov-day">
+  <div class="panel">
+    <div class="mhead day">
+      <h3 id="ov-day-title">날짜</h3>
+      <span class="close">✕</span>
+    </div>
+    <div class="mbody" id="ov-day-body"></div>
+  </div>
+</div>
+
+<!-- 프로젝트 상세 모달 -->
+<div class="overlay" id="ov-project">
+  <div class="panel">
+    <div class="mhead day">
+      <h3 id="ov-project-title">프로젝트</h3>
+      <span class="close">✕</span>
+    </div>
+    <div class="mbody" id="ov-project-body"></div>
+  </div>
+</div>
+
+<!-- ★ 진짜 챗봇 패널 — Claude Opus ★ -->
+<div class="overlay" id="ov-chat">
+  <div class="panel chat-panel">
+    <div class="mhead confirm">
+      <h3>
+        <svg class="icn-bot lg" viewBox="0 0 24 24" role="img" aria-label="일정 봇">
+          <defs>
+            <linearGradient id="botFace" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#FFFFFF"/>
+              <stop offset="100%" stop-color="#F3F7FF"/>
+            </linearGradient>
+          </defs>
+          <circle cx="12" cy="3.4" r="1.2" fill="currentColor"/>
+          <rect x="11.35" y="4.5" width="1.3" height="2.2" rx="0.65" fill="#7AA2FF"/>
+          <ellipse cx="5.4" cy="12.2" rx="1.5" ry="2.2" fill="#AFC6FF"/>
+          <ellipse cx="18.6" cy="12.2" rx="1.5" ry="2.2" fill="#AFC6FF"/>
+          <rect x="4.5" y="6.5" width="15" height="13.5" rx="5.2" fill="currentColor"/>
+          <rect x="6.6" y="8.4" width="10.8" height="9.8" rx="4" fill="url(#botFace)"/>
+          <circle cx="8.5" cy="14.2" r="1.05" fill="#FFD3DF"/>
+          <circle cx="15.5" cy="14.2" r="1.05" fill="#FFD3DF"/>
+          <ellipse cx="9.9" cy="12.1" rx="1.05" ry="1.2" fill="#1F2A44"/>
+          <ellipse cx="14.1" cy="12.1" rx="1.05" ry="1.2" fill="#1F2A44"/>
+          <circle cx="10.2" cy="11.8" r="0.25" fill="#FFFFFF"/>
+          <circle cx="14.4" cy="11.8" r="0.25" fill="#FFFFFF"/>
+          <path d="M9.6 15.1c.7.7 1.4 1 2.4 1s1.7-.3 2.4-1" fill="none" stroke="#5C6FA3" stroke-width="1.1" stroke-linecap="round"/>
+          <path d="M17.9 7.9l.45.9.95.2-.72.65.16.95-.84-.45-.84.45.16-.95-.72-.65.95-.2z" fill="#FFD76A"/>
+        </svg>
+        일정 봇 · Claude Opus 4.7
+      </h3>
+      <span class="close">✕</span>
+    </div>
+    <div class="chat-body" id="chat-body"></div>
+    <div class="chat-input-row">
+      <input id="chat-input" type="text" placeholder="더 알려주거나 수정 요청 — 예: '마감 5/25 로 바꿔줘'" />
+      <button id="chat-send">전송</button>
+    </div>
+  </div>
+</div>
+
+<!-- 언젠가 그룹 모달 -->
+{% for g in someday_groups %}
+<div class="overlay" id="ov-sd-{{ loop.index }}">
+  <div class="panel">
+    <div class="mhead">
+      <h3>💭 {{ g.name }} — 언젠가 {{ g.count }}건</h3>
+      <span class="close">✕</span>
+    </div>
+    <div class="mbody">
+      {% for t in g.tasks %}
+        <div class="sd-item">
+          <div class="num">{{ loop.index }}</div>
+          <div class="body">
+            <div class="title">{{ t.title }}</div>
+            {% if t.note %}<div class="note">{{ t.note }}</div>{% endif %}
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endfor %}
+
+<!-- 토스트 -->
+<div id="toast" style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1f3a5f;color:#fff;padding:10px 18px;border-radius:8px;font-size:0.86rem;display:none;z-index:200;box-shadow:0 6px 20px rgba(0,0,0,0.25);"></div>
+
+<script>
+  window.__BY_DAY__ = {{ by_day_json_str|safe }};
+  window.__PROJECTS__ = {{ projects_json_str|safe }};
+  window.__INBOX__ = {{ inbox_json_str|safe }};
+  window.__TODAY_ISO__ = "{{ today_iso }}";
+</script>
+<script src="{{ url_for('static', filename='dashboard.js') }}?v=14"></script>
+</body>
+</html>

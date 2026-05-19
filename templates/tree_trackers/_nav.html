@@ -1,0 +1,9 @@
+<div class="cb-header">
+  <span><a href="/tree-trackers">← 5개 트리 다 보기</a> · <a href="/build-tracker">평면 막대</a> · <a href="/today">오늘 정리</a></span>
+  <span class="name">Tree #{{ pat.id }} — {{ pat.name }} <span style="color:var(--muted);font-weight:400;">({{ pat.tag }})</span></span>
+  <span>
+    {% for p in patterns %}
+      <a href="/tree-trackers/{{ p.id }}" {% if p.id == pat.id %}style="color:var(--navy);font-weight:800;"{% endif %}>{{ p.name.split()[0] }}</a>
+    {% endfor %}
+  </span>
+</div>

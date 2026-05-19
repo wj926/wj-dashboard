@@ -1,0 +1,6 @@
+<div class="kpi">
+  <div><b>{{ data.stats.total_pages }}</b><span>📂 페이지</span></div>
+  <div><b>{{ data.stats.active_decisions }}</b><span>✅ 유효 결정</span></div>
+  <div><b>{{ data.heat_cells|selectattr('score','gt',0)|list|length }}</b><span>🔥 활동일</span></div>
+  <div><b>{{ data.top_7d[0][0] if data.top_7d else '-' }}</b><span>💭 이번주 TOP</span></div>
+</div>

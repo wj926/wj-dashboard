@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mockup 3 · Decision River</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}?v=15">
+<style>
+  body{background:#f8fafc;}
+  .mk-header{max-width:1280px;margin:14px auto;padding:0 24px;display:flex;justify-content:space-between;align-items:center;color:#475569;font-size:0.86rem;}
+  .mk-header a{color:var(--think);text-decoration:none;margin:0 8px;}
+  .mk-title b{color:var(--navy);}
+  .mk-wrap{max-width:1280px;margin:0 auto;padding:0 24px 30px;display:grid;grid-template-columns:1fr 320px;gap:18px;}
+  .river-card{background:#fff;border-radius:14px;padding:22px;box-shadow:0 4px 14px rgba(0,0,0,0.05);}
+  .toolbar{display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap;align-items:center;}
+  .seg{display:inline-flex;background:#f1f5f9;border-radius:8px;padding:3px;}
+  .seg button{background:transparent;border:none;padding:5px 12px;font-size:0.78rem;color:#475569;cursor:pointer;border-radius:6px;font-weight:600;}
+  .seg button.on{background:#fff;color:var(--navy);box-shadow:0 1px 3px rgba(0,0,0,0.1);}
+  .day-group{margin-bottom:24px;}
+  .day-head{display:flex;align-items:center;gap:10px;font-size:0.84rem;color:var(--navy);font-weight:700;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid var(--border);}
+  .day-head .cnt{background:var(--chip);padding:1px 7px;border-radius:8px;font-size:0.7rem;color:#3d4b58;}
+  .dec-card{display:grid;grid-template-columns:14px 1fr;gap:12px;padding:11px 0;border-bottom:1px dashed var(--border);}
+  .dec-card:last-child{border:none;}
+  .dec-dot{width:12px;height:12px;border-radius:50%;margin-top:6px;flex-shrink:0;}
+  .dec-card.dropped .dec-text{text-decoration:line-through;opacity:0.6;}
+  .dec-head{display:flex;align-items:center;gap:8px;margin-bottom:3px;flex-wrap:wrap;}
+  .page-chip{font-size:0.72rem;padding:1px 8px;border-radius:8px;font-weight:700;}
+  .status-chip{font-size:0.66rem;padding:1px 6px;border-radius:4px;font-weight:700;}
+  .status-active{background:#dcfce7;color:#166534;}
+  .status-dropped{background:#f1f5f9;color:#94a3b8;}
+  .dec-text{font-size:0.9rem;color:#243038;line-height:1.5;}
+  .dec-reason{font-size:0.78rem;color:var(--muted);margin-top:4px;padding-left:10px;border-left:2px solid var(--border);}
+  .side-card{background:#fff;border-radius:14px;padding:18px;box-shadow:0 4px 14px rgba(0,0,0,0.05);margin-bottom:14px;}
+  .side-card h3{margin:0 0 10px;font-size:0.95rem;color:var(--navy);border-bottom:1px solid var(--border);padding-bottom:6px;}
+  .rate-box{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
+  .rate-box div{background:#f1f5f9;padding:10px;border-radius:8px;text-align:center;}
+  .rate-box b{font-size:1.3rem;color:var(--navy);display:block;}
+  .rate-box span{font-size:0.66rem;color:var(--muted);}
+  .pg-list .pg-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px dashed var(--border);font-size:0.84rem;}
+  .pg-list .pg-row:last-child{border:none;}
+</style>
+</head>
+<body>
+<div class="mk-header">
+  <span><a href="/mockups">← 6개 다 보기</a></span>
+  <span class="mk-title">Mockup 3 / 6 · <b>Decision River</b></span>
+  <span><a href="/mockups/2">‹ 2</a><a href="/mockups/4">4 ›</a></span>
+</div>
+
+<div class="mk-wrap">
+  <div class="river-card">
+    <div class="toolbar">
+      <span style="font-size:0.78rem;color:var(--muted);">기간</span>
+      <div class="seg"><button>전체</button><button class="on">90일</button><button>30일</button><button>7일</button></div>
+      <span style="font-size:0.78rem;color:var(--muted);margin-left:10px;">상태</span>
+      <div class="seg"><button class="on">전체</button><button>유효만</button><button>폐기만</button></div>
+      <span style="margin-left:auto;font-size:0.78rem;color:var(--muted);">{{ data.decisions_all|length }} 건</span>
+    </div>
+
+    {% set ns = namespace(prev_date=None) %}
+    {% set palette = ['#3b82f6','#10b981','#f59e0b','#a855f7','#ef4444','#ec4899','#06b6d4','#84cc16'] %}
+    {% set day_groups = {} %}
+    {% for d in data.decisions_all %}
+      {% set _ = day_groups.setdefault(d.date or '날짜 없음', []).append(d) %}
+    {% endfor %}
+
+    {% for day, items in day_groups.items() %}
+      <div class="day-group">
+        <div class="day-head">📅 {{ day }} <span class="cnt">{{ items|length }} 건</span></div>
+        {% for d in items %}
+          {% set col = palette[data.page_color.get(d.page_title, 0)] %}
+          <div class="dec-card {% if d.is_dropped %}dropped{% endif %}">
+            <div class="dec-dot" style="background:{{ col }}"></div>
+            <div>
+              <div class="dec-head">
+                <span class="page-chip" style="background:{{ col }}1f;color:{{ col }};">{{ d.page_title }}</span>
+                {% if d.is_dropped %}<span class="status-chip status-dropped">폐기</span>{% else %}<span class="status-chip status-active">유효</span>{% endif %}
+              </div>
+              <div class="dec-text">{{ d.decision }}</div>
+              {% if d.reason %}<div class="dec-reason">근거 · {{ d.reason }}</div>{% endif %}
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% endfor %}
+  </div>
+
+  <aside>
+    <div class="side-card">
+      <h3>📊 결정 속도</h3>
+      <div class="rate-box">
+        <div><b>{{ data.decisions_all|length }}</b><span>전체</span></div>
+        <div><b>{{ data.decisions_all|rejectattr('is_dropped')|list|length }}</b><span>유효</span></div>
+        <div><b>{{ data.decisions_all|selectattr('is_dropped')|list|length }}</b><span>폐기</span></div>
+      </div>
+    </div>
+
+    <div class="side-card">
+      <h3>🏆 의사결정 TOP</h3>
+      <div class="pg-list">
+        {% set counts = {} %}
+        {% for d in data.decisions_all %}
+          {% set _ = counts.update({d.page_title: counts.get(d.page_title, 0) + 1}) %}
+        {% endfor %}
+        {% for title, cnt in counts.items()|sort(attribute='1', reverse=True) %}
+          <div class="pg-row">
+            <span>{{ title }}</span>
+            <span style="color:var(--think);font-weight:700;">{{ cnt }}</span>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="side-card">
+      <h3>💡 노트</h3>
+      <p style="font-size:0.8rem;color:var(--muted);line-height:1.6;margin:0;">
+        같은 날 다건 결정은 자동 그루핑. 페이지별 색깔. 폐기는 취소선 + 흐리게.
+        실 구현 시 필터 동작 + 날짜별 접기 추가 예정.
+      </p>
+    </div>
+  </aside>
+</div>
+</body>
+</html>

@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+.env.local
+
+# 사용자 데이터/설정 (절대 commit 금지)
+data/
+*.bak
+*.yaml.bak
+
+# OS / 에디터
+.DS_Store
+.idea/
+.vscode/

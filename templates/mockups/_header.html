@@ -1,0 +1,11 @@
+{# 공통 헤더 — 각 mockup 페이지에서 include #}
+<div class="mk-header">
+  <span class="mk-back"><a href="/mockups">← 6개 다 보기</a></span>
+  <span class="mk-title">Mockup {{ n }} / 6 · <b>{{ title }}</b></span>
+  <span class="mk-nav">
+    {% set prev = n - 1 if n > 1 else 6 %}
+    {% set nxt = n + 1 if n < 6 else 1 %}
+    <a href="/mockups/{{ prev }}">‹ 이전 {{ prev }}</a>
+    <a href="/mockups/{{ nxt }}">다음 {{ nxt }} ›</a>
+  </span>
+</div>

@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mockup 5 · Thought→Execution Pipeline</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}?v=15">
+<style>
+  body{background:#f8fafc;}
+  .mk-header{max-width:1280px;margin:14px auto;padding:0 24px;display:flex;justify-content:space-between;align-items:center;color:#475569;font-size:0.86rem;}
+  .mk-header a{color:var(--think);text-decoration:none;margin:0 8px;}
+  .mk-title b{color:var(--navy);}
+  .mk-wrap{max-width:1280px;margin:0 auto;padding:0 24px 30px;}
+  .funnel{background:#fff;border-radius:14px;padding:22px;box-shadow:0 4px 14px rgba(0,0,0,0.05);margin-bottom:18px;display:flex;align-items:center;gap:12px;justify-content:space-between;}
+  .stage{flex:1;text-align:center;padding:14px;border-radius:10px;position:relative;}
+  .stage .n{font-size:1.7rem;font-weight:800;display:block;}
+  .stage .l{font-size:0.78rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;}
+  .arrow{font-size:1.4rem;color:#94a3b8;}
+  .s1{background:#fef3c7;color:#92400e;}
+  .s2{background:#dbeafe;color:#1e40af;}
+  .s3{background:#dcfce7;color:#166534;}
+  .s4{background:#ede9fe;color:#5b21b6;}
+  .s5{background:#fce7f3;color:#9f1239;}
+  .grid{background:#fff;border-radius:14px;padding:22px;box-shadow:0 4px 14px rgba(0,0,0,0.05);}
+  .grid h2{margin:0 0 16px;color:var(--navy);font-size:1.05rem;}
+  .legend{display:flex;gap:14px;font-size:0.74rem;color:var(--muted);margin-bottom:14px;flex-wrap:wrap;}
+  .legend span{display:inline-flex;align-items:center;gap:4px;}
+  .legend i{width:14px;height:10px;border-radius:3px;display:inline-block;}
+  .pipe-row{display:grid;grid-template-columns:160px 1fr;gap:14px;align-items:center;padding:14px 0;border-bottom:1px dashed var(--border);}
+  .pipe-row:last-child{border:none;}
+  .pipe-row .pname{font-size:0.92rem;color:var(--navy);font-weight:700;}
+  .pipe-row .pname a{color:var(--navy);text-decoration:none;}
+  .stages{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;}
+  .seg{}
+  .seg .lbl{font-size:0.66rem;color:var(--muted);text-align:center;margin-bottom:3px;}
+  .seg .bar{height:22px;border-radius:5px;background:#f1f5f9;position:relative;overflow:hidden;}
+  .seg .bar > .fill{height:100%;border-radius:5px;}
+  .seg .bar > .val{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:0.7rem;font-weight:700;color:#1e293b;text-shadow:0 0 4px rgba(255,255,255,0.8);}
+  .f1{background:linear-gradient(90deg,#fbbf24,#f59e0b);}
+  .f2{background:linear-gradient(90deg,#60a5fa,#3b82f6);}
+  .f3{background:linear-gradient(90deg,#4ade80,#16a34a);}
+  .f4{background:linear-gradient(90deg,#a78bfa,#7c3aed);}
+  .f5{background:linear-gradient(90deg,#f472b6,#db2777);}
+  .alert{background:#fff7ed;border:1px solid #fed7aa;color:#c2410c;padding:12px 14px;border-radius:8px;font-size:0.85rem;margin-top:14px;}
+  .formula{background:#f8fafc;padding:12px 14px;border-radius:8px;font-size:0.78rem;color:var(--muted);margin-top:14px;line-height:1.6;font-family:ui-monospace,Menlo,monospace;}
+</style>
+</head>
+<body>
+<div class="mk-header">
+  <span><a href="/mockups">← 6개 다 보기</a></span>
+  <span class="mk-title">Mockup 5 / 6 · <b>Thought → Execution Pipeline</b></span>
+  <span><a href="/mockups/4">‹ 4</a><a href="/mockups/6">6 ›</a></span>
+</div>
+
+<div class="mk-wrap">
+
+  <div class="funnel">
+    {% set raw_count = data.tree[0].pages|sum(attribute='timeline') if data.tree else 0 %}
+    {% set ref_count = data.pipeline|sum(attribute='refine') // 25 %}
+    {% set dec_count = data.stats.total_decisions %}
+    {% set todo_count = data.pipeline|sum(attribute='todo_open') %}
+    {% set prom_count = data.pipeline|sum(attribute='promoted') %}
+    <div class="stage s1"><span class="n">{{ raw_count }}</span><span class="l">📥 Capture</span></div>
+    <span class="arrow">→</span>
+    <div class="stage s2"><span class="n">{{ ref_count }}</span><span class="l">✨ 정제</span></div>
+    <span class="arrow">→</span>
+    <div class="stage s3"><span class="n">{{ dec_count }}</span><span class="l">🧭 결정</span></div>
+    <span class="arrow">→</span>
+    <div class="stage s4"><span class="n">{{ todo_count }}</span><span class="l">📌 todo</span></div>
+    <span class="arrow">→</span>
+    <div class="stage s5"><span class="n">{{ prom_count }}</span><span class="l">🚀 업무 승격</span></div>
+  </div>
+
+  <div class="grid">
+    <h2>페이지별 진행 단계</h2>
+
+    <div class="legend">
+      <span><i class="f1"></i>Capture (raw 양)</span>
+      <span><i class="f2"></i>정제 (지금 생각 + 결정 작성량)</span>
+      <span><i class="f3"></i>결정 수</span>
+      <span><i class="f4"></i>todo 완료율</span>
+      <span><i class="f5"></i>업무 승격</span>
+    </div>
+
+    {% for p in data.pipeline|sort(attribute='decision', reverse=True) %}
+      <div class="pipe-row">
+        <div class="pname"><a href="/think/page/{{ p.path|urlencode }}">{{ p.title }}</a></div>
+        <div class="stages">
+          <div class="seg"><div class="lbl">capture</div><div class="bar"><div class="fill f1" style="width:{{ p.capture }}%"></div><span class="val">{{ p.capture }}</span></div></div>
+          <div class="seg"><div class="lbl">정제</div><div class="bar"><div class="fill f2" style="width:{{ p.refine }}%"></div><span class="val">{{ p.refine }}</span></div></div>
+          <div class="seg"><div class="lbl">결정</div><div class="bar"><div class="fill f3" style="width:{{ p.decision }}%"></div><span class="val">{{ p.decision }}</span></div></div>
+          <div class="seg"><div class="lbl">todo</div><div class="bar"><div class="fill f4" style="width:{{ p.todo_pct }}%"></div><span class="val">{{ p.todo_pct }}%</span></div></div>
+          <div class="seg"><div class="lbl">승격</div><div class="bar"><div class="fill f5" style="width:{{ p.promoted }}%"></div><span class="val">{{ p.promoted }}</span></div></div>
+        </div>
+      </div>
+    {% endfor %}
+
+    {% set stuck = data.pipeline|selectattr('todo_open','gt',3)|list %}
+    {% if stuck %}
+      <div class="alert">
+        🚧 <b>정체 구간</b> — 미완 todo 가 3개 이상 누적된 페이지:
+        {% for p in stuck %}<b>{{ p.title }}</b>({{ p.todo_open }}){% if not loop.last %}, {% endif %}{% endfor %}
+      </div>
+    {% endif %}
+
+    {% set unpromoted = data.pipeline|selectattr('promoted','eq',0)|selectattr('decision','gt',30)|list %}
+    {% if unpromoted %}
+      <div class="alert" style="background:#fef9c3;border-color:#fde047;color:#854d0e;">
+        🚀 <b>승격 후보</b> — 결정 충분한데 업무로 안 옮긴 페이지:
+        {% for p in unpromoted %}<b>{{ p.title }}</b>{% if not loop.last %}, {% endif %}{% endfor %}
+      </div>
+    {% endif %}
+
+    <div class="formula">
+      <b>점수 공식</b><br>
+      capture = raw 본문 길이 / 30 (max 100)<br>
+      정제 = (지금 생각 + 결정 섹션 길이) / 30<br>
+      결정 = 결정 수 × 12<br>
+      todo = 완료한 todo / 전체 todo × 100<br>
+      승격 = 업무 대시보드에 source_thinking 으로 연결된 task 수 (현재 미구현)
+    </div>
+  </div>
+</div>
+</body>
+</html>

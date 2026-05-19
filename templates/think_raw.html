@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>raw {{ date_str }} · wj 생각</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}?v=15">
+<link rel="stylesheet" href="{{ url_for('static', filename='thinking.css') }}?v=30">
+<style>
+.raw-wrap{max-width:920px;margin:18px auto;padding:0 24px;}
+.raw-wrap h1{color:var(--navy);font-size:1.2rem;margin:0 0 10px;}
+.raw-wrap pre{background:#fff;border:1px solid var(--border);border-radius:8px;padding:18px 20px;
+  white-space:pre-wrap;word-break:break-word;font-size:0.9rem;line-height:1.55;color:#243038;
+  font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;}
+.raw-wrap a.back{color:#94a3b8;text-decoration:none;font-size:0.8rem;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <span class="brand">wj<span class="dot">.</span></span>
+    {% include "_tabs.html" %}
+    <span class="topright"><a class="back" href="/think">← 생각</a></span>
+  </div>
+  <div class="raw-wrap">
+    <h1>📓 raw / {{ date_str }}.md</h1>
+    <pre>{{ body }}</pre>
+  </div>
+</div>
+</body>
+</html>

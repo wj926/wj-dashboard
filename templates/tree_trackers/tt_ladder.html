@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ko"><head>
+{% include "combos/_base_head.html" %}
+{% import "tree_trackers/_macros.html" as m %}
+<title>Ladder · 단계 중심 트리</title>
+<style>
+  .phase-block { background:#f8fafc; border-radius:8px; padding:10px 14px; margin:8px 0; border-left:4px solid var(--p-color); }
+  .phase-block.MVP { --p-color:#16a34a; }
+  .phase-block.V2 { --p-color:#f59e0b; }
+  .phase-block.V3 { --p-color:#94a3b8; }
+  .phase-head { display:flex; align-items:center; gap:8px; font-weight:800; margin-bottom:6px; color:var(--p-color); font-size:0.9rem; }
+</style>
+</head><body>
+{% include "tree_trackers/_nav.html" %}
+<div class="tree-wrap">
+  <div class="tree-hero">
+    <h1>🪜 Milestone Ladder — 단계 중심</h1>
+    <p>페이지 → MVP / V2 / V3 단계 → 결정. 로드맵 회의·"지금 어느 단계?" 답에 강함.</p>
+  </div>
+
+  {% for title, phase_data in tree.page_phase_pct.items() %}
+    {% set page_decs = tree.by_page[title] %}
+    {% set total_decs = page_decs|length %}
+    {% set ship_total = page_decs|selectattr('impl_status','eq','shipped')|list|length %}
+    <div class="tree-card">
+      <h2>📂 {{ title }}
+        <span class="pct" style="font-size:1rem;">{{ (100*ship_total/total_decs)|round }}% 전체</span>
+      </h2>
+      {% for phase in ['MVP', 'V2', 'V3'] %}
+        {% set stat = phase_data[phase] %}
+        {% if stat %}
+          <div class="phase-block {{ phase }}">
+            <div class="phase-head">
+              {% if phase == 'MVP' %}🟢{% elif phase == 'V2' %}🟡{% else %}⚪{% endif %}
+              {{ phase }} <span style="font-weight:400;color:var(--muted);font-size:0.78rem;">— {{ stat.shipped }}/{{ stat.total }} 완료 · {{ stat.pct }}%</span>
+              <span style="margin-left:auto;display:flex;align-items:center;gap:6px;">
+                <div class="mini-bar" style="width:120px;">
+                  {% if stat.shipped %}<span style="background:#16a34a;width:{{ (100*stat.shipped/stat.total)|round }}%;height:6px;display:inline-block;"></span>{% endif %}
+                </div>
+              </span>
+            </div>
+            <div class="tn">
+              {% for d in page_decs %}
+                {% if d.phase == phase %}
+                  {{ m.decision_row(d, "  ") }}
+                {% endif %}
+              {% endfor %}
+            </div>
+          </div>
+        {% endif %}
+      {% endfor %}
+    </div>
+  {% endfor %}
+</div>
+</body></html>

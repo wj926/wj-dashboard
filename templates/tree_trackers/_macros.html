@@ -1,0 +1,55 @@
+{# 결정 한 줄 #}
+{% macro decision_row(d, indent_str="") %}
+  <div class="line">
+    <span class="twig">{{ indent_str }}</span>
+    <span class="ic">{% if d.impl_status == 'shipped' %}✅{% elif d.impl_status == 'in_progress' %}⏳{% else %}📋{% endif %}</span>
+    <span class="dt">{{ d.date or '—' }}</span>
+    <span class="lbl">{{ d.decision[:80] }}{% if d.decision|length > 80 %}…{% endif %}</span>
+    {% if d.impl_status == 'shipped' %}<span class="badge s">shipped</span>{% elif d.impl_status == 'in_progress' %}<span class="badge p">in_prog</span>{% else %}<span class="badge x">planned</span>{% endif %}
+    {% if d.evidence and d.evidence.commits > 0 %}<span class="ev">{{ d.evidence.commits }}c · {{ d.evidence.files }}f</span>{% endif %}
+  </div>
+{% endmacro %}
+
+{# 결정 + 증거 펼침 (Spine 용) #}
+{% macro decision_with_evidence(d, indent_str="") %}
+  <details>
+    <summary>
+      <div class="line">
+        <span class="twig">{{ indent_str }}</span>
+        <span class="arr"></span>
+        <span class="ic">{% if d.impl_status == 'shipped' %}✅{% elif d.impl_status == 'in_progress' %}⏳{% else %}📋{% endif %}</span>
+        <span class="dt">{{ d.date or '—' }}</span>
+        <span class="lbl">{{ d.decision[:70] }}{% if d.decision|length > 70 %}…{% endif %}</span>
+        {% if d.impl_status == 'shipped' %}<span class="badge s">shipped</span>{% elif d.impl_status == 'in_progress' %}<span class="badge p">in_prog</span>{% else %}<span class="badge x">planned</span>{% endif %}
+      </div>
+    </summary>
+    {% if d.reason %}
+      <div class="line" style="padding-left:18px;">
+        <span class="twig">{{ indent_str }}    </span><span class="ic">💡</span>
+        <span class="lbl" style="font-size:0.78rem;color:var(--muted);">근거: {{ d.reason[:120] }}</span>
+      </div>
+    {% endif %}
+    {% if d.evidence %}
+      <div class="line" style="padding-left:18px;">
+        <span class="twig">{{ indent_str }}    </span><span class="ic">📦</span>
+        <span class="lbl" style="font-size:0.78rem;">
+          PR {{ d.evidence.pr }} · {{ d.evidence.commits }} commits · {{ d.evidence.files }} files · tests: {{ d.evidence.tests }}
+        </span>
+      </div>
+    {% endif %}
+  </details>
+{% endmacro %}
+
+{# 진행률 mini bar #}
+{% macro mini_bar(shipped, in_progress, planned) %}
+  {% set total = shipped + in_progress + planned %}
+  {% if total > 0 %}
+    <div class="mini-bar">
+      <div style="width:100%;">
+        {% if shipped %}<span style="width:{{ (100*shipped/total)|round }}%;background:#16a34a;display:block;float:left;height:6px;"></span>{% endif %}
+        {% if in_progress %}<span style="width:{{ (100*in_progress/total)|round }}%;background:#f59e0b;display:block;float:left;height:6px;"></span>{% endif %}
+      </div>
+    </div>
+    <span class="pct-mini">{{ (100*shipped/total)|round }}%</span>
+  {% endif %}
+{% endmacro %}

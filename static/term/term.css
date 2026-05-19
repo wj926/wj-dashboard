@@ -1,0 +1,45 @@
+/* wj-term — 신규 터미널 모듈 스타일 (claude-notebook 포팅) */
+
+/* 터미널 컨테이너 + xterm 살짝 보정 */
+.wj-term-root { position: relative; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.wj-term-body { flex: 1 1 auto; min-height: 0; position: relative; background: #1e1e1e; }
+.wj-term-body .xterm { padding: 6px 4px; touch-action: none; }
+.wj-term-body .xterm-viewport { background: transparent !important; touch-action: none; }
+/* 터미널 컨테이너 #xterm 자체에도 — 모바일 브라우저가 native 스크롤 시작 못 하게 */
+#xterm { touch-action: none; }
+
+/* 상태 dot */
+.wj-term-status {
+  position: absolute; top: 6px; right: 14px; z-index: 12;
+  font-size: 0.7rem; color: #94a3b8; pointer-events: none;
+  background: rgba(15,23,42,0.6); padding: 2px 6px; border-radius: 4px;
+}
+.wj-term-status.disconnected { color: #ef4444; }
+.wj-term-status.connected { color: #22c55e; }
+
+/* 커스텀 스크롤바 — 어두운 #1e1e1e 배경에 확실히 보이는 톤 */
+.wj-term-scrollbar {
+  position: absolute; top: 4px; right: 0; bottom: 4px;
+  width: 14px; z-index: 80;
+  background: rgba(168, 85, 247, 0.28);  /* 트랙 — 살짝 보이는 보라 */
+  border-radius: 7px;
+  pointer-events: auto;
+  touch-action: none;
+  display: none;
+}
+.wj-term-scrollbar.active { display: block; }
+.wj-term-scrollbar-thumb {
+  position: absolute; left: 2px; right: 2px; top: 4px;
+  height: 40px;
+  background: #c084fc;        /* 밝은 보라 thumb — 어두운 배경 위 확실히 보임 */
+  border-radius: 5px;
+  cursor: pointer; opacity: 1;
+  transition: background 0.15s;
+  box-shadow: 0 0 4px rgba(168, 85, 247, 0.6);
+}
+.wj-term-scrollbar-thumb:hover,
+.wj-term-scrollbar-thumb.dragging { background: #e9d5ff; }
+
+/* 모바일 키보드 가드 — keyboard-guard.js 협업 */
+:root { --kbd-h: 0px; }
+html.is-keyboard-open .layout { padding-bottom: max(env(keyboard-inset-height, 0px), var(--kbd-h)); }

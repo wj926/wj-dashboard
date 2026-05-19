@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ page.title }} · wj 생각</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}?v=15">
+<link rel="stylesheet" href="{{ url_for('static', filename='thinking.css') }}?v=30">
+</head>
+<body>
+<div class="wrap think-wrap">
+
+  <div class="topbar">
+    <span class="brand">wj<span class="dot">.</span></span>
+    {% include "_tabs.html" %}
+    <span class="topright"><a href="/think" style="background:var(--think);color:#fff;padding:6px 12px;border-radius:8px;text-decoration:none;font-weight:700;font-size:0.78rem;">← 생각 목록</a></span>
+  </div>
+
+  <div class="think-page">
+
+    <!-- 헤더 -->
+    <div class="tp-header" style="position:relative;">
+      <div style="position:absolute;top:18px;right:22px;display:flex;gap:6px;">
+        <a href="/think/page/{{ page.path|urlencode }}/edit"
+           style="background:#fff;color:var(--navy);border:1px solid var(--border);padding:8px 14px;border-radius:8px;text-decoration:none;font-weight:700;font-size:0.82rem;">
+          📝 .md
+        </a>
+        <a href="/think/chat/page/{{ page.path|urlencode }}"
+           style="background:var(--think);color:#fff;padding:8px 16px;border-radius:8px;text-decoration:none;font-weight:700;font-size:0.86rem;">
+          💬 대화
+        </a>
+      </div>
+      <div class="tp-crumb">
+        <a href="/think" class="tp-home">← 생각 목록</a>
+        <span class="tp-crumb-sep">/</span>
+        <span class="tp-crumb-cat">{{ page.category }}</span>
+        {% if page.type == 'long-term-plan' %}<span class="t-type ltp">장기 플랜</span>{% elif page.type == 'idea' %}<span class="t-type idea">아이디어</span>{% endif %}
+      </div>
+      <h1>{{ page.title }}</h1>
+      {% if page.outputs %}
+        <div class="tp-outputs">
+          {% for o in page.outputs %}
+            <a class="tp-out" href="{{ o.url }}" target="_blank" rel="noopener">{{ o.label }} ↗</a>
+          {% endfor %}
+        </div>
+      {% endif %}
+      <div class="tp-meta">
+        {% if page.tags %}
+          {% for t in page.tags %}<span class="tp-tag">{{ t }}</span>{% endfor %}
+        {% endif %}
+        <span class="tp-update">갱신 {{ page.updated[:10] }}</span>
+        {% if page.status != 'active' %}<span class="tp-status">{{ page.status }}</span>{% endif %}
+      </div>
+    </div>
+
+    {% if page.synopsis %}
+      {% set syn = page.synopsis %}
+      {# 방향 A · Vision Hero: tagline + why + DREAM 4카드 (의미 맞춤 viz). pillars/solid/open 은 본문에. #}
+      <div class="vis-hero">
+        {% if syn.tagline or syn.why %}
+          <div class="vis-hero-top">
+            <div class="vis-hero-eyebrow">VISION · {{ page.title }}</div>
+            {% if syn.tagline %}<div class="vis-hero-tag">{{ syn.tagline }}</div>{% endif %}
+            {% if syn.why %}
+              <div class="vis-hero-why">
+                <span class="q">"</span>
+                <p>{{ syn.why }}</p>
+              </div>
+            {% endif %}
+          </div>
+        {% endif %}
+        {% if syn.dream %}
+          <div class="vis-dream">
+            <div class="vis-dream-label">─── 도착하면 이런 모습</div>
+            <div class="vis-cards">
+              {% for d in syn.dream %}
+                {% if d is mapping %}
+                  <div class="vis-card c{{ loop.index }}">
+                    <div>
+                      <div class="num">{{ "%02d"|format(loop.index) }}</div>
+                      {% if d.svg %}<div class="vis-viz">{{ d.svg|safe }}</div>{% endif %}
+                      <div class="kw">{{ d.kw }}</div>
+                    </div>
+                    {% if d.ds %}<div class="ds">{{ d.ds }}</div>{% endif %}
+                  </div>
+                {% else %}
+                  {# legacy: dream 이 단순 문자열 list 인 경우 fallback #}
+                  <div class="vis-card c{{ loop.index }}">
+                    <div><div class="num">{{ "%02d"|format(loop.index) }}</div><div class="kw">{{ d }}</div></div>
+                  </div>
+                {% endif %}
+              {% endfor %}
+            </div>
+          </div>
+        {% endif %}
+      </div>
+    {% endif %}
+
+    <div class="tp-body-grid">
+
+      <!-- 메인 본문 -->
+      <main class="tp-main">
+
+        <!-- 정제층 -->
+        {% if page.sections.current %}
+          <section class="tp-section refine">
+            <h2>지금 생각</h2>
+            <div class="tp-md">{{ page.sections.current|md|safe }}</div>
+          </section>
+        {% endif %}
+
+        {% set decisions_live = decisions|rejectattr('is_dropped')|sort(attribute='date', reverse=true)|list %}
+        {% if decisions_live %}
+          <section class="tp-section refine" data-page-path="{{ page.path }}">
+            <h2>
+              <span>결정·방향 <span class="cnt">{{ decisions_live|length }}</span></span>
+              <button id="auto-mark-btn" class="auto-mark-btn" title="Claude 가 페이지 본문 + outputs + solid/open + 타임라인을 보고 각 결정의 구현 상태를 자동 판단해 갱신">🔄 자동 마킹</button>
+            </h2>
+            {% if impl_stats and impl_stats.total %}
+              <div class="impl-summary big">
+                <div class="impl-headline">
+                  <div class="impl-pct-num">{{ impl_stats.pct }}<span>%</span></div>
+                  <div class="impl-pct-label">완료 <b>{{ impl_stats.by.shipped }}</b> / 분모 {{ impl_stats.total }}{% if impl_stats.by.dropped %} <span class="impl-dropped">(폐기 {{ impl_stats.by.dropped }} 제외)</span>{% endif %}</div>
+                </div>
+                <div class="impl-bar big" role="progressbar" aria-valuenow="{{ impl_stats.pct }}" aria-valuemin="0" aria-valuemax="100">
+                  <div class="impl-fill shipped" style="width:{{ impl_stats.pct }}%"></div>
+                  {% set planned_pct = (impl_stats.by.planned * 100 / impl_stats.total)|round %}
+                  {% set in_pct = (impl_stats.by.in_progress * 100 / impl_stats.total)|round %}
+                  <div class="impl-fill in_progress" style="left:{{ impl_stats.pct }}%;width:{{ in_pct }}%"></div>
+                </div>
+                <div class="impl-legend">
+                  <span class="il shipped">✓ 완료 <b>{{ impl_stats.by.shipped }}</b></span>
+                  <span class="il in_progress">⏳ 진행 <b>{{ impl_stats.by.in_progress }}</b></span>
+                  <span class="il planned">⏸ 계획 <b>{{ impl_stats.by.planned }}</b></span>
+                  {% if impl_stats.by.dropped %}<span class="il dropped">✗ 폐기 <b>{{ impl_stats.by.dropped }}</b></span>{% endif %}
+                </div>
+              </div>
+            {% endif %}
+            <div class="dec-list">
+              {% for d in decisions_live %}
+                <div class="dec-row inline" data-dec-hash="{{ d.hash }}" data-impl="{{ d.impl_status }}">
+                  <div class="dec-meta">
+                    <span class="dec-date">{{ d.date or '—' }}</span>
+                  </div>
+                  <div class="dec-body">
+                    <div class="dec-text md-inline">{{ d.decision|md|safe }}</div>
+                    {% if d.reason %}<div class="dec-reason md-inline">근거 · {{ d.reason|md|safe }}</div>{% endif %}
+                    <div class="impl-chips" role="group" aria-label="구현 상태">
+                      <button class="ic-chip" data-status="planned" title="계획">계획</button>
+                      <button class="ic-chip" data-status="in_progress" title="진행중">진행</button>
+                      <button class="ic-chip" data-status="shipped" title="완료">완료</button>
+                      <button class="ic-chip" data-status="dropped" title="폐기">폐기</button>
+                    </div>
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+          </section>
+        {% endif %}
+
+        {% if todos %}
+          <section class="tp-section refine">
+            <h2>할 일 <span class="cnt">{{ todos|length }}</span></h2>
+            <ul class="todo-list">
+              {% for t in todos %}
+                <li class="{% if t.done %}done{% endif %}">{% if t.done %}✓{% else %}○{% endif %} <span class="md-inline">{{ t.text|md|safe }}</span></li>
+              {% endfor %}
+            </ul>
+          </section>
+        {% endif %}
+
+        <!-- 로그층 -->
+        {% if page.sections.open_questions %}
+          <section class="tp-section log">
+            <h2>열린 질문</h2>
+            <div class="tp-md">{{ page.sections.open_questions|md|safe }}</div>
+          </section>
+        {% endif %}
+
+        {% if timeline %}
+          <section class="tp-section log">
+            <h2>타임라인 <span class="cnt">{{ timeline|length }}</span></h2>
+            <ol class="tl-inline">
+              {% for e in timeline %}
+                <li><span class="tl-date">{{ e.date or '—' }}</span><span class="tl-text">{{ e.text }}</span></li>
+              {% endfor %}
+            </ol>
+          </section>
+        {% endif %}
+
+        <!-- 그 외 섹션 (배경, 컨텍스트 등) -->
+        {% for skey, scontent in page.sections.items() %}
+          {% if skey not in ['current', 'decisions', 'todos', 'open_questions', 'timeline'] and scontent %}
+            <section class="tp-section neutral">
+              <h2>{{ skey }}</h2>
+              <div class="tp-md">{{ scontent|md|safe }}</div>
+            </section>
+          {% endif %}
+        {% endfor %}
+
+        {% if raw_mentions %}
+          <section class="tp-section log">
+            <h2>📓 원본 raw 메모 <span class="cnt">{{ raw_mentions|length }}</span></h2>
+            <div class="raw-mentions">
+              {% for c in raw_mentions %}
+                <details class="raw-mention">
+                  <summary>
+                    <span class="rm-date">{{ c.date }}</span>
+                    <span class="rm-heading">{{ c.heading }}</span>
+                    <a class="rm-file" href="/think/raw/{{ c.date }}" onclick="event.stopPropagation()">→ {{ c.file }}</a>
+                  </summary>
+                  <pre class="rm-body">{{ c.body }}</pre>
+                </details>
+              {% endfor %}
+            </div>
+          </section>
+        {% endif %}
+      </main>
+
+      <!-- 우측: 메타 + 백링크 -->
+      <aside class="tp-side">
+        <div class="tp-info">
+          <h4>페이지 정보</h4>
+          <dl>
+            <dt>카테고리</dt><dd>{{ page.category }}</dd>
+            <dt>type</dt><dd>{{ page.type }}</dd>
+            <dt>slug</dt><dd>{{ page.slug }}</dd>
+            <dt>created</dt><dd>{{ page.created[:10] }}</dd>
+            <dt>updated</dt><dd>{{ page.updated[:10] }}</dd>
+          </dl>
+        </div>
+
+        {% if page.links %}
+          <div class="tp-info">
+            <h4>연결 (이 페이지 → 다른)</h4>
+            {% for l in page.links %}<div class="tp-link">[[{{ l }}]]</div>{% endfor %}
+          </div>
+        {% endif %}
+
+        {% if backlinks %}
+          <div class="tp-info">
+            <h4>백링크 (다른 → 이 페이지)</h4>
+            {% for bl in backlinks %}
+              <a class="tp-back-link" href="/think/page/{{ bl.path|urlencode }}">
+                <div class="tp-back-title">{{ bl.title }}</div>
+                <div class="tp-back-cat">{{ bl.category }}</div>
+              </a>
+            {% endfor %}
+          </div>
+        {% endif %}
+
+        {% if page.source_thinking %}
+          <div class="tp-info bridge-hint">
+            <h4>업무 연결</h4>
+            <div style="font-size:0.78rem;color:var(--muted);">아직 업무로 승격되지 않음</div>
+          </div>
+        {% endif %}
+      </aside>
+    </div>
+  </div>
+
+</div>
+<script>
+(function(){
+  const root = document.querySelector('.tp-section[data-page-path]');
+  if (!root) return;
+  const relPath = root.dataset.pagePath;
+
+  function recalcStats() {
+    const rows = root.querySelectorAll('.dec-row');
+    const by = {planned:0, in_progress:0, shipped:0, dropped:0};
+    rows.forEach(r => { by[r.dataset.impl || 'planned']++; });
+    const total = by.planned + by.in_progress + by.shipped;  // 폐기 제외
+    const pct = total ? Math.round(100 * by.shipped / total) : 0;
+    const inPct = total ? Math.round(100 * by.in_progress / total) : 0;
+    // 큰 % 숫자
+    const pctNum = root.querySelector('.impl-pct-num');
+    if (pctNum) pctNum.innerHTML = pct + '<span>%</span>';
+    const pctLabel = root.querySelector('.impl-pct-label');
+    if (pctLabel) {
+      pctLabel.innerHTML = '완료 <b>' + by.shipped + '</b> / 분모 ' + total +
+        (by.dropped ? ' <span class="impl-dropped">(폐기 ' + by.dropped + ' 제외)</span>' : '');
+    }
+    // 두 fill (shipped + in_progress)
+    const fShip = root.querySelector('.impl-fill.shipped');
+    if (fShip) fShip.style.width = pct + '%';
+    const fIn = root.querySelector('.impl-fill.in_progress');
+    if (fIn) { fIn.style.left = pct + '%'; fIn.style.width = inPct + '%'; }
+    // 범례
+    const legend = root.querySelector('.impl-legend');
+    if (legend) {
+      const setIl = (cls, val) => {
+        const el = legend.querySelector('.il.' + cls + ' b');
+        if (el) el.textContent = val;
+      };
+      setIl('shipped', by.shipped);
+      setIl('in_progress', by.in_progress);
+      setIl('planned', by.planned);
+      setIl('dropped', by.dropped);
+    }
+  }
+
+  // 🔄 자동 마킹 버튼
+  const autoBtn = document.getElementById('auto-mark-btn');
+  if (autoBtn) {
+    autoBtn.addEventListener('click', async () => {
+      const hint = prompt('Claude 에게 줄 힌트(선택, 없으면 빈칸):\n예) "최근 Bento 레이아웃 운영중 반영"');
+      if (hint === null) return;  // cancel
+      autoBtn.disabled = true;
+      const original = autoBtn.textContent;
+      autoBtn.textContent = '⏳ Claude 판단 중... (최대 60초)';
+      try {
+        const r = await fetch('/api/think/page/auto-mark', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({rel_path: relPath, hint: hint}),
+        });
+        const j = await r.json();
+        if (!r.ok || !j.ok) throw new Error(j.error || r.statusText);
+        autoBtn.textContent = `✓ ${j.applied}/${j.total} 갱신됨`;
+        setTimeout(() => location.reload(), 800);
+      } catch (e) {
+        alert('자동 마킹 실패: ' + e.message);
+        autoBtn.textContent = original;
+        autoBtn.disabled = false;
+      }
+    });
+  }
+
+  root.addEventListener('click', async e => {
+    const btn = e.target.closest('.ic-chip');
+    if (!btn) return;
+    e.preventDefault();
+    const row = btn.closest('.dec-row');
+    const decHash = row.dataset.decHash;
+    const status = btn.dataset.status;
+    if (row.dataset.impl === status) return;  // 이미 그 상태
+    btn.classList.add('busy');
+    try {
+      const r = await fetch('/api/think/decision/state', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({rel_path: relPath, dec_hash: decHash, status: status}),
+      });
+      const j = await r.json();
+      if (!r.ok || !j.ok) throw new Error(j.error || r.statusText);
+      row.dataset.impl = status;
+      row.classList.toggle('dropped', status === 'dropped');
+      recalcStats();
+    } catch (err) {
+      alert('상태 변경 실패: ' + err.message);
+    } finally {
+      btn.classList.remove('busy');
+    }
+  });
+})();
+</script>
+</body>
+</html>

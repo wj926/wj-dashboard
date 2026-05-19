@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="ko"><head>
+{% include "combos/_base_head.html" %}
+<title>Mosaic · 위젯 다수</title>
+<style>
+  .mz { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
+  .mz .w { background:#fff;border-radius:12px;padding:14px;box-shadow:0 4px 12px rgba(0,0,0,0.04);}
+  .mz .w h3 { margin:0 0 8px; font-size:0.84rem; color:var(--navy);
+              display:flex; justify-content:space-between; border-bottom:1px solid var(--border); padding-bottom:5px; }
+  .mz .w h3 .src { font-size:0.62rem; color:var(--muted); font-weight:600; }
+  .mz .span2 { grid-column: span 2; }
+  .mz .span4 { grid-column: span 4; }
+  @media (max-width:1100px) { .mz { grid-template-columns:repeat(2,1fr); } .mz .span4{grid-column:span 2;} .mz .span2{grid-column:span 2;} }
+  @media (max-width:600px) { .mz { grid-template-columns:1fr; } .mz .span4,.mz .span2{grid-column:span 1;} }
+  .single-fc { background:#fff; border-left:4px solid var(--rk); padding:14px;border-radius:10px;}
+  .single-fc.r1{--rk:#dc2626;} .single-fc.r2{--rk:#ea580c;} .single-fc.r3{--rk:#d97706;}
+  .single-fc .num{font-size:1.4rem;font-weight:800;color:var(--rk);}
+  .single-fc .title{font-size:0.92rem;color:var(--navy);font-weight:700;margin:4px 0 6px;}
+  .single-fc .meta{font-size:0.72rem;color:var(--muted);}
+</style>
+</head><body>
+{% include "combos/_nav.html" %}
+<div class="cb-wrap">
+  {% include "partials/kpi_bar.html" %}
+
+  <div class="mz">
+    <div class="w">
+      <h3>🔥 핫토픽 <span class="src">#2</span></h3>
+      {% include "partials/hot_topics.html" %}
+    </div>
+    {% for f in data.focus[:3] %}
+      <div class="w">
+        <h3>💭 #{{ loop.index }} <span class="src">#6</span></h3>
+        <div class="single-fc r{{ loop.index }}">
+          <div class="num">{{ f.score|round(0)|int }}</div>
+          <div class="title"><a href="/think/page/{{ f.path|urlencode }}" style="color:inherit;text-decoration:none;">{{ f.title }}</a></div>
+          <div class="meta">결정 {{ f.decisions }} · todo 미완 {{ f.todos_open }}</div>
+        </div>
+      </div>
+    {% endfor %}
+
+    <div class="w span2">
+      <h3>🔥 활동 히트맵 <span class="src">#2</span></h3>
+      {% set uid = "c11h" %}{% include "partials/heat_strip.html" %}
+    </div>
+    <div class="w span2">
+      <h3>🧭 결정 흐름 <span class="src">#3</span></h3>
+      {% set limit = 6 %}{% include "partials/river_list.html" %}
+    </div>
+
+    <div class="w span2">
+      <h3>📊 진행 파이프라인 <span class="src">#5</span></h3>
+      {% set show_funnel = false %}{% include "partials/pipeline_bars.html" %}
+    </div>
+    <div class="w">
+      <h3>📂 폴더 <span class="src">#4</span></h3>
+      {% include "partials/tree_list.html" %}
+    </div>
+    <div class="w">
+      <h3>🌐 관계망 <span class="src">#1</span></h3>
+      {% set uid = "c11g" %}{% include "partials/graph_mini.html" %}
+    </div>
+  </div>
+</div>
+</body></html>

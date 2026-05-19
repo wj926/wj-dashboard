@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>wj · 생각</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}?v=15">
+<link rel="stylesheet" href="{{ url_for('static', filename='combos.css') }}?v=6">
+<link rel="stylesheet" href="{{ url_for('static', filename='thinking.css') }}?v=30">
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<style>
+  body { background:#f1f4f8; }
+  .ts-hero { max-width:1400px; margin:14px auto 6px; padding:0 24px; display:flex; align-items:center; gap:14px; }
+  .ts-hero h2 { margin:0; color:var(--navy); font-size:1.4rem; }
+  .ts-hero .sub { color:var(--muted); font-size:0.84rem; }
+  .ts-hero .actions { margin-left:auto; display:flex; gap:8px; }
+  .ts-hero .actions a {
+    background:var(--think); color:#fff; padding:8px 14px; border-radius:8px;
+    text-decoration:none; font-weight:700; font-size:0.84rem;
+  }
+  .ts-hero .actions a.outline { background:#fff; color:var(--think); border:1px solid var(--think); }
+  .ts-hero .actions a.tree { background:#fff; color:#a855f7; border:1px solid #a855f7; }
+
+  /* Spotlight focus (마운트용) */
+  .fc-big { background:#fff;border-radius:14px;padding:18px 20px;box-shadow:0 6px 20px rgba(0,0,0,0.06);
+            display:grid;grid-template-columns:50px 1fr 110px;gap:16px;align-items:center;
+            border-left:5px solid var(--rk);margin-bottom:12px;}
+  .fc-big.r1{--rk:#dc2626;} .fc-big.r2{--rk:#ea580c;} .fc-big.r3{--rk:#d97706;} .fc-big.r4{--rk:#65a30d;} .fc-big.r5{--rk:#0891b2;}
+  .fc-big .rank{font-size:2rem;font-weight:800;color:var(--rk);text-align:center;line-height:1;}
+  .fc-big .ttl{font-size:1.15rem;color:var(--navy);font-weight:800;margin-bottom:5px;display:flex;align-items:center;gap:8px;}
+  .fc-big .ttl a{color:var(--navy);text-decoration:none;}
+  .fc-big .ttl .chat-btn {font-size:0.7rem;background:var(--think);color:#fff;padding:3px 8px;border-radius:5px;text-decoration:none;font-weight:700;}
+  .fc-big .meta{display:flex;gap:10px;font-size:0.76rem;color:var(--muted);margin-bottom:7px;flex-wrap:wrap;}
+  .fc-big .meta b{color:#243038;}
+  .fc-big .recent{background:#f8fafc;border-radius:8px;padding:7px 11px;font-size:0.78rem;color:#243038;line-height:1.45;border-left:3px solid var(--rk);}
+  .fc-big .scbx{text-align:center;}
+  .fc-big .scbx .n{font-size:1.7rem;font-weight:800;color:var(--rk);line-height:1;}
+  .fc-big .scbx .lb{font-size:0.62rem;color:var(--muted);text-transform:uppercase;margin-top:2px;}
+  .fc-big .scbx .br{height:5px;background:#e2e8f0;border-radius:3px;margin-top:6px;overflow:hidden;}
+  .fc-big .scbx .br > div{height:100%;background:var(--rk);}
+
+  /* Mind map mini wrapper */
+  .mm-mini-wrap { position:relative; background:#0e1626; border-radius:10px; height:340px; overflow:hidden; }
+  .mm-mini-wrap svg { width:100%; height:100%; cursor:grab; }
+  .mm-mini-wrap svg:active { cursor:grabbing; }
+  .mm-mini-wrap .expand-btn {
+    position:absolute; top:8px; right:8px; background:rgba(255,255,255,0.9);
+    color:var(--navy); padding:4px 10px; border-radius:6px;
+    text-decoration:none; font-size:0.72rem; font-weight:700; z-index:10;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="topbar">
+    <span class="brand">wj<span class="dot">.</span></span>
+    {% include "_tabs.html" %}
+    <span class="topright"><span id="sync-state" class="sync-state">생각 {{ data.stats.total_pages }} · 결정 {{ data.stats.active_decisions }}</span></span>
+  </div>
+
+  <div class="ts-hero">
+    <h2>💭 지금 머릿속 TOP 5</h2>
+    <span class="sub">최근 14일 가중 집중도</span>
+    <div class="actions">
+      <a href="/think/chat" class="outline">💬 새 대화</a>
+      <a href="/tree-vis/mindmap" class="tree">🌳 전체 구조</a>
+      <a href="/think/legacy" class="outline" style="font-size:0.74rem;">옛 3-패널</a>
+    </div>
+  </div>
+
+  <div class="cb-wrap ts-grid" style="padding-top:8px;">
+    <!-- 좌: 카테고리 트리 (sticky) -->
+    <aside class="ts-tree" id="ts-tree">
+      <div class="tt-head">
+        <span class="tt-h">📂 카테고리</span>
+        <a href="/tree-vis/mindmap" class="tt-more" title="마인드맵 전체화면">전체 →</a>
+      </div>
+      {% for branch in data.tree %}
+        {% set cat = branch.category %}
+        <div class="tt-cat" data-cat="{{ cat }}">
+          <div class="tt-cat-row">
+            <span class="tt-cat-dot cat-{{ loop.index0 % 6 }}"></span>
+            <span class="tt-cat-name">{{ cat }}</span>
+            <span class="tt-cat-cnt">{{ branch.pages|length }}</span>
+          </div>
+          {% if branch.pages %}
+            <ul class="tt-pages">
+              {% for p in branch.pages|sort(attribute='updated', reverse=true) %}
+                <li><a href="/think/page/{{ p.path|urlencode }}" class="tt-page" title="{{ p.title }}">{{ p.title }}</a></li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <div class="tt-empty">아직 비어있음</div>
+          {% endif %}
+        </div>
+      {% endfor %}
+    </aside>
+
+    <!-- 중: TOP5 -->
+    <div class="ts-center">
+      <div id="cat-filter-bar" class="cat-filter-bar" style="display:none;">
+        <span>필터:</span>
+        <span class="cfb-tag" id="cfb-tag-name"></span>
+        <button id="cfb-clear">✕ 전체</button>
+      </div>
+      {% set top5 = data.focus[:5] %}{% set max_sc = top5[0].score if top5 else 1 %}
+      {% set cat_index = {} %}
+      {% for branch in data.tree %}{% set _ = cat_index.update({branch.category: loop.index0 % 6}) %}{% endfor %}
+      {% for f in top5 %}
+        {% set ci = cat_index.get(f.category, 0) %}
+        <div class="card-wrap" data-cat="{{ f.category }}">
+          <a class="card-link" href="/think/page/{{ f.path|urlencode }}" aria-label="{{ f.title }}">
+            <div class="fc-big linkable r{{ loop.index }}">
+              <div class="rank">#{{ loop.index }}</div>
+              <div>
+                <div class="ttl">
+                  <span>{{ f.title }}</span>
+                  <span class="cat-chip cat-{{ ci }}" data-cat="{{ f.category }}">{{ f.category }}</span>
+                </div>
+                <div class="meta">
+                  <span>📅 <b>{{ f.updated }}</b></span>
+                  <span>🧭 결정 <b>{{ f.decisions }}</b></span>
+                  <span>📌 미완 <b>{{ f.todos_open }}</b></span>
+                </div>
+                {% if f.impl_total %}
+                  <div class="fc-progress" title="완료 {{ f.impl_shipped }} / 분모 {{ f.impl_total }}">
+                    <div class="fcp-num">{{ f.impl_pct }}<span>%</span></div>
+                    <div class="fcp-bar"><div class="fcp-fill" style="width:{{ f.impl_pct }}%"></div></div>
+                    <div class="fcp-label"><b>{{ f.impl_shipped }}</b>/{{ f.impl_total }}</div>
+                  </div>
+                {% endif %}
+                {% if f.last_decision %}
+                  <div class="recent"><b>{{ f.last_decision.date or '-' }}</b> · {{ f.last_decision.decision[:90] }}{% if f.last_decision.decision|length > 90 %}…{% endif %}</div>
+                {% endif %}
+              </div>
+              <div class="scbx">
+                <div class="n">{{ f.score|round(0)|int }}</div>
+                <div class="lb">집중도</div>
+                <div class="br"><div style="width:{{ (f.score/max_sc*100)|round }}%"></div></div>
+              </div>
+            </div>
+          </a>
+        </div>
+      {% endfor %}
+    </div>
+
+    <!-- 우: River + 핫토픽 -->
+    <aside class="cb-stack ts-right" style="position:sticky;top:14px;align-self:start;">
+      <div class="cb-card">
+        <h3>🧭 최근 결정 8 <span class="src">River</span></h3>
+        {% set limit = 8 %}{% include "partials/river_list.html" %}
+      </div>
+    </aside>
+    </div>
+    <!-- 끝 ts-grid -->
+
+    <details class="ts-mindmap-fold" style="margin-top:14px;">
+      <summary>🌳 마인드맵 mini <span class="src" style="margin-left:6px;color:var(--muted);font-size:0.74rem;">접기/펼치기</span></summary>
+      <div class="cb-card" style="margin-top:8px;">
+        <div class="mm-mini-wrap">
+          <a href="/tree-vis/mindmap" class="expand-btn">⤢ 전체화면</a>
+          <svg id="mm-mini"></svg>
+        </div>
+      </div>
+    </details>
+
+    <div class="activity-row" style="margin-top:14px;">
+      <div class="cb-card" style="padding:10px 14px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+          <span style="font-weight:700;color:var(--navy);font-size:0.78rem;">🕐 날짜별 활동</span>
+          <span style="color:var(--muted);font-size:0.64rem;">색 진할수록 그날 더 많이</span>
+        </div>
+        {% set uid = "ths" %}{% include "partials/heat_strip.html" %}
+      </div>
+      <div class="cb-card" style="padding:10px 14px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+          <span style="font-weight:700;color:var(--navy);font-size:0.78rem;">🔥 최근 7일 어떤 프로젝트</span>
+          <span style="color:var(--muted);font-size:0.64rem;">막대 길수록 그 페이지에서 활동 많음</span>
+        </div>
+        {% include "partials/hot_topics.html" %}
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+// 카테고리 chip 클릭 → TOP5 필터링
+(function(){
+  const bar = document.getElementById('cat-filter-bar');
+  const tag = document.getElementById('cfb-tag-name');
+  const clear = document.getElementById('cfb-clear');
+  function applyFilter(cat) {
+    document.querySelectorAll('.card-wrap').forEach(c => {
+      c.style.display = (!cat || c.dataset.cat === cat) ? '' : 'none';
+    });
+    document.querySelectorAll('.tt-cat').forEach(t => {
+      t.style.opacity = (!cat || t.dataset.cat === cat) ? '1' : '0.3';
+    });
+    if (cat) { bar.style.display = 'flex'; tag.textContent = cat; }
+    else { bar.style.display = 'none'; }
+  }
+  document.addEventListener('click', e => {
+    const chip = e.target.closest('.cat-chip');
+    if (chip) {
+      e.preventDefault(); e.stopPropagation();
+      applyFilter(chip.dataset.cat);
+      return;
+    }
+    if (e.target.id === 'cfb-clear') {
+      applyFilter(null);
+    }
+  });
+  if (clear) clear.addEventListener('click', () => applyFilter(null));
+})();
+</script>
+
+<script>
+// Mindmap mini (force layout, 메인 페이지 임베디드용)
+(function(){
+  const data = {{ h|tojson }};
+  const nodes = [];
+  const links = [];
+  nodes.push({id:"root", name:data.name, type:"root", size:18});
+  data.children.forEach((p, pi) => {
+    const pid = "p-" + pi;
+    nodes.push({id:pid, name:p.name, type:"page", color:p.color, size:13});
+    links.push({source:"root", target:pid, kind:"rp"});
+    p.children.forEach((d, di) => {
+      const did = pid + "-d" + di;
+      nodes.push({id:did, name:d.name, type:"decision", impl:d.impl, size:4});
+      links.push({source:pid, target:did, kind:"pd", impl:d.impl});
+    });
+  });
+
+  const svg = d3.select("#mm-mini");
+  const rect = svg.node().getBoundingClientRect();
+  const W = rect.width || 500, H = rect.height || 340;
+  svg.attr("viewBox", `0 0 ${W} ${H}`);
+
+  const g = svg.append("g");
+  svg.call(d3.zoom().scaleExtent([0.3, 3]).on("zoom", e => g.attr("transform", e.transform)));
+
+  const sim = d3.forceSimulation(nodes)
+    .force("link", d3.forceLink(links).id(d=>d.id).distance(l => l.kind==="rp" ? 90 : 40).strength(0.7))
+    .force("charge", d3.forceManyBody().strength(d => d.type==="root"?-400:d.type==="page"?-200:-40))
+    .force("center", d3.forceCenter(W/2, H/2))
+    .force("collide", d3.forceCollide().radius(d => d.size + 3));
+
+  g.append("g").selectAll("line").data(links).join("line")
+    .attr("stroke", d => d.kind==="rp"?"#475569":d.impl==="shipped"?"#22c55e":d.impl==="in_progress"?"#f59e0b":"#475569")
+    .attr("stroke-opacity", 0.5)
+    .attr("stroke-width", d => d.kind==="rp"?1.8:0.9);
+
+  const node = g.append("g").selectAll("g").data(nodes).join("g")
+    .call(d3.drag()
+      .on("start",(e,d)=>{if(!e.active)sim.alphaTarget(0.3).restart();d.fx=d.x;d.fy=d.y;})
+      .on("drag",(e,d)=>{d.fx=e.x;d.fy=e.y;})
+      .on("end",(e,d)=>{if(!e.active)sim.alphaTarget(0);d.fx=null;d.fy=null;}));
+
+  node.append("circle")
+    .attr("r", d => d.size)
+    .attr("fill", d => d.type==="root"?"#a855f7":d.type==="page"?d.color:d.impl==="shipped"?"#22c55e":d.impl==="in_progress"?"#f59e0b":"#94a3b8")
+    .attr("stroke","#0e1626").attr("stroke-width",1.2);
+
+  node.filter(d => d.type !== "decision").append("text")
+    .text(d => d.type==="root"?"🧠":d.name.slice(0,8))
+    .attr("text-anchor","middle").attr("dy",4).attr("fill","#fff")
+    .attr("font-weight",700).attr("font-size", d=>d.type==="root"?"10px":"9px")
+    .style("pointer-events","none").style("text-shadow","0 1px 2px rgba(0,0,0,0.6)");
+
+  sim.on("tick", () => {
+    g.selectAll("line").attr("x1",d=>d.source.x).attr("y1",d=>d.source.y).attr("x2",d=>d.target.x).attr("y2",d=>d.target.y);
+    node.attr("transform", d=>`translate(${d.x},${d.y})`);
+  });
+})();
+</script>
+</body>
+</html>

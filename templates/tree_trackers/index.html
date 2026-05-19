@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="ko"><head>
+{% include "combos/_base_head.html" %}
+<title>구현 추적 트리 5종</title>
+</head><body>
+<div class="cb-header">
+  <span><a href="/build-tracker">← 평면 막대</a> · <a href="/today">오늘 정리</a></span>
+  <span class="name">구현 추적 트리 후보 5개</span>
+  <span></span>
+</div>
+<div class="tree-wrap" style="text-align:center;">
+  <h1 style="font-size:1.6rem;color:var(--navy);margin:18px 0 4px;">🌲 트리 구조로 구현 추적</h1>
+  <p style="color:var(--muted);margin:0 0 4px;font-size:0.92rem;">"뭐가 어디까지 됐는지" 를 트리로. Codex 와 심도있게 논의한 7 패턴 중 핵심 5개.</p>
+  <p style="color:var(--muted);margin:0 0 18px;font-size:0.82rem;">평면 막대(<a href="/build-tracker">/build-tracker</a>)는 진행률 스캔, 트리는 구조 이해 — 보완 관계.</p>
+</div>
+<div class="combo-card-grid">
+  {% for p in patterns %}
+    <a class="combo-tile" href="/tree-trackers/{{ p.id }}">
+      <span class="code">{{ p.tag }}</span>
+      <h3>{{ p.name }}</h3>
+      <p>{{ p.desc }}</p>
+    </a>
+  {% endfor %}
+</div>
+</body></html>

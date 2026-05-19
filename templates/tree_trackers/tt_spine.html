@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="ko"><head>
+{% include "combos/_base_head.html" %}
+{% import "tree_trackers/_macros.html" as m %}
+<title>Spine · 결정 중심 트리</title>
+</head><body>
+{% include "tree_trackers/_nav.html" %}
+<div class="tree-wrap">
+  <div class="tree-hero">
+    <h1>🦴 Decision Spine — 결정 중심</h1>
+    <p>페이지 → 결정 → 증거(PR/커밋/파일/테스트). 각 결정을 클릭하면 펼쳐서 근거와 증거 볼 수 있음.</p>
+  </div>
+
+  {% for title, decs in tree.by_page.items() %}
+    {% set ship = decs|selectattr('impl_status','eq','shipped')|list|length %}
+    {% set prog = decs|selectattr('impl_status','eq','in_progress')|list|length %}
+    {% set plan = decs|selectattr('impl_status','eq','planned')|list|length %}
+    <div class="tree-card">
+      <h2>📂 {{ title }}
+        <span style="display:flex;align-items:center;gap:8px;font-size:0.78rem;font-weight:400;color:var(--muted);">
+          결정 {{ decs|length }}
+          {{ m.mini_bar(ship, prog, plan) }}
+        </span>
+      </h2>
+      <div class="tn">
+        {% for d in decs %}
+          {{ m.decision_with_evidence(d, "├─ " if not loop.last else "└─ ") }}
+        {% endfor %}
+      </div>
+    </div>
+  {% endfor %}
+</div>
+</body></html>

@@ -1,0 +1,74 @@
+<div class="heat-strip">
+  <svg id="heat-{{ uid|default('1') }}" viewBox="0 0 800 120" preserveAspectRatio="none"></svg>
+  <div class="heat-legend">
+    적음
+    <span class="sq" style="background:#ebedf0"></span>
+    <span class="sq" style="background:#c7d2fe"></span>
+    <span class="sq" style="background:#818cf8"></span>
+    <span class="sq" style="background:#6366f1"></span>
+    <span class="sq" style="background:#4338ca"></span>
+    많음
+  </div>
+</div>
+<script>
+(function(){
+  const cells = {{ data.heat_cells|tojson }};
+  const svg = document.getElementById("heat-{{ uid|default('1') }}");
+  const cellSize = 6, gap = 1;
+  const topPad = 12, leftPad = 18;
+  const weeks = Math.ceil(cells.length / 7) + 2;
+  const W = leftPad + weeks*(cellSize+gap), H = topPad + 7*(cellSize+gap);
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  const NS = "http://www.w3.org/2000/svg";
+  function color(s){
+    if(s===0) return "#ebedf0";
+    if(s<=3) return "#c7d2fe";
+    if(s<=8) return "#818cf8";
+    if(s<=20) return "#6366f1";
+    return "#4338ca";
+  }
+  const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const DOWS = ["", "M", "", "W", "", "F", ""];
+  const first = new Date(cells[0].date);
+  const firstWk = (first.getDay()+6)%7;
+
+  // 요일 라벨 (월/수/금만)
+  DOWS.forEach((d, i) => {
+    if (!d) return;
+    const t = document.createElementNS(NS, "text");
+    t.setAttribute("x", leftPad - 3);
+    t.setAttribute("y", topPad + i*(cellSize+gap) + cellSize - 1);
+    t.setAttribute("text-anchor", "end");
+    t.setAttribute("class", "hs-dow");
+    t.textContent = d;
+    svg.appendChild(t);
+  });
+
+  // 셀 + 월 라벨 (월이 바뀐 첫 셀 위에)
+  let lastMonth = -1;
+  cells.forEach((c, i) => {
+    const wk = Math.floor((i+firstWk)/7), dy = (i+firstWk)%7;
+    const x = leftPad + wk*(cellSize+gap);
+    const y = topPad + dy*(cellSize+gap);
+    const dt = new Date(c.date);
+    const m = dt.getMonth();
+    if (m !== lastMonth) {
+      const lab = document.createElementNS(NS, "text");
+      lab.setAttribute("x", x);
+      lab.setAttribute("y", topPad - 5);
+      lab.setAttribute("class", "hs-month");
+      lab.textContent = MONTHS[m];
+      svg.appendChild(lab);
+      lastMonth = m;
+    }
+    const r = document.createElementNS(NS,"rect");
+    r.setAttribute("x", x);
+    r.setAttribute("y", y);
+    r.setAttribute("width", cellSize); r.setAttribute("height", cellSize);
+    r.setAttribute("rx",2); r.setAttribute("fill",color(c.score));
+    r.setAttribute("class","heat-cell");
+    r.innerHTML = `<title>${c.date} · ${c.score}점</title>`;
+    svg.appendChild(r);
+  });
+})();
+</script>

@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="ko"><head>
+{% include "combos/_base_head.html" %}
+<title>Orbit · 관계망 우선</title>
+</head><body>
+{% include "combos/_nav.html" %}
+<div class="cb-wrap">
+  {% include "partials/kpi_bar.html" %}
+
+  <div class="cb-2col-7-3">
+    <div class="cb-card">
+      <h3>🌐 Link Constellation (hero) <span class="src">#1</span></h3>
+      <div style="min-height:400px;" id="big-graph"></div>
+      <div class="gm-legend">노드 = 페이지 · 엣지 = wikilink · 크기 = 활동량 · 드래그/줌 가능</div>
+    </div>
+    <div class="cb-stack">
+      <div class="cb-card">
+        <h3>💭 Focus TOP 5 <span class="src">#6</span></h3>
+        {% include "partials/focus_mini.html" %}
+      </div>
+      <div class="cb-card">
+        <h3>🔥 이번주 핫토픽 <span class="src">#2</span></h3>
+        {% include "partials/hot_topics.html" %}
+      </div>
+    </div>
+  </div>
+
+  <div class="cb-2col" style="margin-top:14px;">
+    <div class="cb-card">
+      <h3>🧭 최근 결정 8 <span class="src">#3</span></h3>
+      {% set limit = 8 %}{% include "partials/river_list.html" %}
+    </div>
+    <div class="cb-card">
+      <h3>📊 진행 파이프라인 <span class="src">#5</span></h3>
+      {% set show_funnel = false %}{% include "partials/pipeline_bars.html" %}
+    </div>
+  </div>
+</div>
+<script>
+(function(){
+  const data = {{ {"nodes": data.nodes, "edges": data.edges}|tojson }};
+  const wrap = document.getElementById("big-graph");
+  const svg = d3.select(wrap).append("svg").attr("width","100%").attr("height",400);
+  const W = wrap.getBoundingClientRect().width || 600, H = 400;
+  svg.attr("viewBox", `0 0 ${W} ${H}`);
+  svg.append("rect").attr("width",W).attr("height",H).attr("fill","#0f172a").attr("rx",8);
+  const g = svg.append("g");
+  svg.call(d3.zoom().on("zoom", e => g.attr("transform", e.transform)));
+  const nodes = data.nodes.map(n=>({...n}));
+  const edges = data.edges.map(e=>({...e}));
+  const sim = d3.forceSimulation(nodes)
+    .force("link", d3.forceLink(edges).id(d=>d.id).distance(140))
+    .force("charge", d3.forceManyBody().strength(-400))
+    .force("center", d3.forceCenter(W/2, H/2))
+    .force("collide", d3.forceCollide().radius(d => 30+d.weight*1.4));
+  const link = g.append("g").selectAll("line").data(edges).join("line").attr("stroke","#475569").attr("stroke-opacity",0.55).attr("stroke-width",1.5);
+  const color = d3.scaleOrdinal(d3.schemeTableau10);
+  const node = g.append("g").selectAll("g").data(nodes).join("g")
+    .call(d3.drag()
+      .on("start",(e,d)=>{if(!e.active)sim.alphaTarget(0.3).restart();d.fx=d.x;d.fy=d.y;})
+      .on("drag",(e,d)=>{d.fx=e.x;d.fy=e.y;})
+      .on("end",(e,d)=>{if(!e.active)sim.alphaTarget(0);d.fx=null;d.fy=null;}));
+  node.append("circle").attr("r", d=>20+d.weight*1.2).attr("fill", d=>color(d.category)).attr("stroke","#0e1626").attr("stroke-width",2);
+  node.append("text").text(d=>d.title).attr("text-anchor","middle").attr("dy",4).attr("font-size","11px").attr("fill","#f1f5f9").style("pointer-events","none").style("font-weight","700");
+  sim.on("tick", () => {
+    link.attr("x1",d=>d.source.x).attr("y1",d=>d.source.y).attr("x2",d=>d.target.x).attr("y2",d=>d.target.y);
+    node.attr("transform", d=>`translate(${d.x},${d.y})`);
+  });
+})();
+</script>
+</body></html>

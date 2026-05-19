@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>wj · 생각 시각화 후보 6개</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}?v=15">
+<style>
+  body { background:#f1f4f8; }
+  .mkx-hero { max-width:1200px; margin:30px auto 20px; padding:0 24px; }
+  .mkx-hero h1 { font-size:1.6rem; color:var(--navy); margin:0 0 6px; }
+  .mkx-hero p { color:var(--muted); margin:0; font-size:0.95rem; }
+  .mkx-grid {
+    max-width:1200px; margin:0 auto; padding:14px 24px 40px;
+    display:grid; grid-template-columns:repeat(3, 1fr); gap:18px;
+  }
+  @media(max-width:900px){ .mkx-grid{grid-template-columns:1fr;} }
+  .mkx-card {
+    background:#fff; border-radius:14px; padding:18px 20px;
+    box-shadow:0 4px 14px rgba(0,0,0,0.06);
+    text-decoration:none; color:inherit;
+    transition:transform 0.12s, box-shadow 0.12s;
+    border:2px solid transparent;
+  }
+  .mkx-card:hover { transform:translateY(-2px); box-shadow:0 8px 22px rgba(0,0,0,0.1); border-color:var(--think); }
+  .mkx-num {
+    display:inline-flex; align-items:center; justify-content:center;
+    width:30px; height:30px; border-radius:8px; font-weight:800;
+    background:var(--think); color:#fff; font-size:0.95rem; margin-bottom:10px;
+  }
+  .mkx-card h3 { margin:0 0 6px; font-size:1.05rem; color:var(--navy); }
+  .mkx-card .tag { font-size:0.7rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em; }
+  .mkx-card p { font-size:0.85rem; color:#4a5562; line-height:1.55; margin:8px 0 10px; }
+  .mkx-preview { background:#f8fafc; border-radius:8px; padding:10px; min-height:90px;
+                 font-family:ui-monospace,Menlo,monospace; font-size:0.66rem;
+                 color:#475569; line-height:1.4; white-space:pre; overflow:hidden; }
+  .mkx-pros { margin-top:8px; font-size:0.74rem; color:#15803d; }
+  .mkx-cons { font-size:0.74rem; color:#a16207; }
+  .stripe { display:flex; gap:6px; margin:6px 0; }
+  .stripe span { font-size:0.7rem; padding:2px 7px; border-radius:8px; background:var(--chip); color:#3d4b58; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="topbar">
+    <span class="brand">wj<span class="dot">.</span></span>
+    {% include "_tabs.html" %}
+    <span class="topright"><a href="/think" style="color:#94a3b8;text-decoration:none;font-size:0.78rem;">← 생각 메인</a></span>
+  </div>
+
+  <div class="mkx-hero">
+    <h1>생각 시각화 후보 6개</h1>
+    <p>실제 데이터({{ data.stats.total_pages }} 페이지 / {{ data.stats.total_decisions }} 결정) 로 모두 구현됨. 카드 클릭 → 상세. 마음에 드는 패턴들 조합해서 알려주세요.</p>
+    <div class="stripe">
+      <span>📂 페이지 {{ data.stats.total_pages }}</span>
+      <span>✅ 유효 결정 {{ data.stats.active_decisions }}</span>
+      <span>🕐 타임라인 {{ data.heat_cells|selectattr('score','gt',0)|list|length }}일</span>
+      <span>오늘 {{ data.today }}</span>
+    </div>
+  </div>
+
+  <div class="mkx-grid">
+
+    <a class="mkx-card" href="/mockups/1">
+      <span class="mkx-num">1</span>
+      <span class="tag">관계망 · graph</span>
+      <h3>Link Constellation</h3>
+      <p>페이지 간 wikilink 를 d3 force layout 으로. 노드 크기=활동, 색=카테고리.</p>
+      <div class="mkx-preview">    (thinking)━━(wj 앱)
+          ╲      ╲ │
+    (논문)━━(업무 대시보드)
+   ● 크기=활동량  ● 색=카테고리</div>
+      <div class="mkx-pros">▲ 관계망 직관</div>
+      <div class="mkx-cons">▽ 페이지 적을 땐 빈약</div>
+    </a>
+
+    <a class="mkx-card" href="/mockups/2">
+      <span class="mkx-num">2</span>
+      <span class="tag">활동 · heatmap</span>
+      <h3>Thinking Heat Calendar</h3>
+      <p>GitHub 컨트리뷰션 스타일. 일자별 결정+타임라인 점수.</p>
+      <div class="mkx-preview">월 . . ░ █ ██ ▒ .
+화 . ░ ░ ░ █ █ █
+수 . . ░ ▒ ▓ █ ←오늘
+TOP: 1)wj 앱 2)업무</div>
+      <div class="mkx-pros">▲ "요즘 뭐 많이" 한눈</div>
+      <div class="mkx-cons">▽ 내용은 약함</div>
+    </a>
+
+    <a class="mkx-card" href="/mockups/3">
+      <span class="mkx-num">3</span>
+      <span class="tag">결정 · timeline</span>
+      <h3>Decision River</h3>
+      <p>30개 결정 시간순. 페이지별 색깔, 폐기/유효 필터.</p>
+      <div class="mkx-preview">2026-05-15 ━━━━━━━
+ ● 유효 thinking · Obsidian 안 씀
+   근거: 웹뷰 직접 구축
+ ● 유효 업무 · 단계적 구현
+ ○ 폐기 wj 앱 · 음성 우선
+2026-05-14 ━━━━━━━</div>
+      <div class="mkx-pros">▲ 왜 그렇게 결정?</div>
+      <div class="mkx-cons">▽ 폴더 구조 약함</div>
+    </a>
+
+    <a class="mkx-card" href="/mockups/4">
+      <span class="mkx-num">4</span>
+      <span class="tag">진행도 · tree</span>
+      <h3>Folder Pulse Tree</h3>
+      <p>폴더(카테고리) → 페이지 트리. 활동 dots + 결정수 + todo 진행 + 비활성 경고.</p>
+      <div class="mkx-preview">📂 시스템 (4)  🔥 HOT
+ ├ 🟢 thinking ●●●● 결정9 todo 1/6
+ ├ 🟢 업무 대시 ●●●●● 결정11 todo 1/7
+ ├ 🟢 wj 앱   ●●●● 결정8 todo 5/15
+ └ 🟡 논문 관리 ●● ⚠14일 변경X</div>
+      <div class="mkx-pros">▲ 폴더+진행도 합성</div>
+      <div class="mkx-cons">▽ 관계망 없음</div>
+    </a>
+
+    <a class="mkx-card" href="/mockups/5">
+      <span class="mkx-num">5</span>
+      <span class="tag">파이프 · pipeline</span>
+      <h3>Thought→Execution Pipeline</h3>
+      <p>Capture→정제→결정→todo→업무 승격 5단계 막대.</p>
+      <div class="mkx-preview">Capture→정제→결정→todo→승격
+  12   4    30   32    3
+
+thinking  정 ███ 결 ████ td ██░ 승 █░
+업무       정 ███ 결 █████ td ██░ 승 ██
+wj 앱      정 ███ 결 ████ td ████ 승 ██</div>
+      <div class="mkx-pros">▲ 어디까지 진행?</div>
+      <div class="mkx-cons">▽ 점수 공식 의존</div>
+    </a>
+
+    <a class="mkx-card" href="/mockups/6">
+      <span class="mkx-num">6</span>
+      <span class="tag">몰입 · focus</span>
+      <h3>"지금 머릿속" Focus Cards</h3>
+      <p>최근 14일 가중 집중도 TOP 5. 각 카드 = 최근 결정 + 다음 액션.</p>
+      <div class="mkx-preview">💭 지금 머릿속 TOP 5
+#1 업무 대시보드  집중도 92 ████
+   최근결정 11 · 열린질문 5
+#2 wj 앱         집중도 85 ████
+   최근결정 8  · 열린질문 6
+#3 thinking 시스템 집중도 77 ███</div>
+      <div class="mkx-pros">▲ 요즘 빠진 것 즉답</div>
+      <div class="mkx-cons">▽ 점수 공식 신뢰</div>
+    </a>
+
+  </div>
+</div>
+</body>
+</html>

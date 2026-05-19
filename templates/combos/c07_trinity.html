@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="ko"><head>
+{% include "combos/_base_head.html" %}
+<title>Trinity · 옵시디언 3패널</title>
+</head><body>
+{% include "combos/_nav.html" %}
+<div class="cb-wrap">
+  <div class="cb-side-3">
+    <aside class="cb-card" style="position:sticky;top:14px;align-self:start;">
+      <h3>📂 탐색 <span class="src">#4</span></h3>
+      {% include "partials/tree_list.html" %}
+    </aside>
+
+    <main class="cb-card">
+      <h3>🧭 Decision River + Heat strip <span class="src">#3 + #2</span></h3>
+      <div style="margin-bottom:14px;">
+        {% set uid = "c7h" %}{% include "partials/heat_strip.html" %}
+      </div>
+      {% set limit = 18 %}{% include "partials/river_list.html" %}
+    </main>
+
+    <aside class="cb-stack">
+      <div class="cb-card">
+        <h3>🌐 관계망 <span class="src">#1</span></h3>
+        {% set uid = "c7g" %}{% include "partials/graph_mini.html" %}
+      </div>
+      <div class="cb-card">
+        <h3>🔥 핫토픽 <span class="src">#2</span></h3>
+        {% include "partials/hot_topics.html" %}
+      </div>
+      <div class="cb-card">
+        <h3>💭 Focus 3 <span class="src">#6</span></h3>
+        {% set limit = 3 %}{% include "partials/focus_mini.html" %}
+      </div>
+    </aside>
+  </div>
+
+  <div class="cb-card" style="margin-top:14px;">
+    <h3>📊 진행 파이프라인 (bottom strip) <span class="src">#5</span></h3>
+    {% include "partials/pipeline_bars.html" %}
+  </div>
+</div>
+</body></html>

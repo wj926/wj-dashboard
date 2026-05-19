@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mockup 4 · Folder Pulse Tree</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}?v=15">
+<style>
+  body{background:#f8fafc;}
+  .mk-header{max-width:1280px;margin:14px auto;padding:0 24px;display:flex;justify-content:space-between;align-items:center;color:#475569;font-size:0.86rem;}
+  .mk-header a{color:var(--think);text-decoration:none;margin:0 8px;}
+  .mk-title b{color:var(--navy);}
+  .mk-wrap{max-width:1280px;margin:0 auto;padding:0 24px 30px;}
+  .cat-block{background:#fff;border-radius:14px;padding:22px;box-shadow:0 4px 14px rgba(0,0,0,0.05);margin-bottom:18px;}
+  .cat-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;}
+  .cat-head h2{margin:0;color:var(--navy);font-size:1.15rem;}
+  .cat-hot{background:#fee2e2;color:#b91c1c;padding:3px 10px;border-radius:8px;font-size:0.74rem;font-weight:700;}
+  .page-row{display:grid;grid-template-columns:30px 1fr 100px 110px 110px 100px;gap:14px;align-items:center;padding:14px 0;border-bottom:1px dashed var(--border);}
+  .page-row:last-child{border:none;}
+  .p-light{width:14px;height:14px;border-radius:50%;}
+  .p-light.green{background:#22c55e;box-shadow:0 0 8px rgba(34,197,94,0.4);}
+  .p-light.yellow{background:#eab308;box-shadow:0 0 8px rgba(234,179,8,0.4);}
+  .p-light.gray{background:#cbd5e1;}
+  .p-name{font-size:0.95rem;color:var(--navy);font-weight:700;}
+  .p-name a{color:var(--navy);text-decoration:none;}
+  .p-name a:hover{color:var(--think);}
+  .p-meta{font-size:0.7rem;color:var(--muted);margin-top:3px;}
+  .dots{display:flex;gap:2px;}
+  .dots span{width:8px;height:14px;border-radius:2px;background:#e2e8f0;}
+  .dots span.on{background:var(--think);}
+  .col-label{font-size:0.7rem;color:var(--muted);}
+  .col-val{font-size:0.86rem;color:var(--navy);font-weight:700;}
+  .pbar{height:6px;background:#e2e8f0;border-radius:3px;overflow:hidden;margin-top:4px;}
+  .pbar > div{height:100%;background:linear-gradient(90deg,#22c55e,#16a34a);}
+  .warn{background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:6px;font-size:0.7rem;font-weight:700;}
+  .stale-section{margin-top:30px;}
+  .stale-section h3{color:var(--navy);font-size:1rem;margin-bottom:10px;}
+  .stale-pill{display:inline-flex;align-items:center;gap:6px;background:#fff7ed;border:1px solid #fed7aa;color:#c2410c;padding:6px 12px;border-radius:8px;font-size:0.8rem;margin:4px 6px 0 0;}
+</style>
+</head>
+<body>
+<div class="mk-header">
+  <span><a href="/mockups">← 6개 다 보기</a></span>
+  <span class="mk-title">Mockup 4 / 6 · <b>Folder Pulse Tree</b></span>
+  <span><a href="/mockups/3">‹ 3</a><a href="/mockups/5">5 ›</a></span>
+</div>
+
+<div class="mk-wrap">
+  {% for cat in data.tree %}
+    {% set hot = cat.pages|sum(attribute='activity_recent') %}
+    <div class="cat-block">
+      <div class="cat-head">
+        <h2>📂 {{ cat.category }} <span style="color:var(--muted);font-size:0.85rem;font-weight:400;">({{ cat.pages|length }} 페이지)</span></h2>
+        {% if hot > 30 %}<span class="cat-hot">🔥 HOT · 최근 30일 {{ hot }}점</span>{% endif %}
+      </div>
+
+      <div class="page-row" style="border-bottom:2px solid var(--border);padding:0 0 8px;">
+        <span></span>
+        <span class="col-label">페이지</span>
+        <span class="col-label">활동</span>
+        <span class="col-label">결정 · todo</span>
+        <span class="col-label">todo 진행</span>
+        <span class="col-label">마지막 갱신</span>
+      </div>
+
+      {% for p in cat.pages|sort(attribute='activity_recent', reverse=True) %}
+        {% set light = 'green' if p.days_idle <= 3 else ('yellow' if p.days_idle <= 14 else 'gray') %}
+        {% set actbuckets = 5 %}
+        {% set dotn = ((p.activity_recent / 12)|round(0,'ceil'))|int %}
+        {% if dotn > actbuckets %}{% set dotn = actbuckets %}{% endif %}
+        <div class="page-row">
+          <span class="p-light {{ light }}" title="{{ p.days_idle }}일 전 갱신"></span>
+          <div>
+            <div class="p-name"><a href="/think/page/{{ p.path|urlencode }}">{{ p.title }}</a></div>
+            <div class="p-meta">{{ p.type }} · {{ p.timeline }} 타임라인</div>
+          </div>
+          <div>
+            <div class="dots">
+              {% for i in range(actbuckets) %}<span class="{% if i < dotn %}on{% endif %}"></span>{% endfor %}
+            </div>
+            <div class="p-meta">{{ p.activity_recent }} 점</div>
+          </div>
+          <div>
+            <div class="col-val">결정 {{ p.decisions }}</div>
+            <div class="p-meta">미완 todo {{ p.todos_total - p.todos_done }}</div>
+          </div>
+          <div>
+            <div class="col-val">{{ p.todos_done }} / {{ p.todos_total }}</div>
+            <div class="pbar"><div style="width:{{ (100*p.todos_done/p.todos_total)|round if p.todos_total else 0 }}%"></div></div>
+          </div>
+          <div>
+            <div class="col-val">{{ p.updated }}</div>
+            {% if p.days_idle > 14 %}<span class="warn">⚠ {{ p.days_idle }}일</span>{% endif %}
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% endfor %}
+
+  {% set stale = [] %}
+  {% for cat in data.tree %}{% for p in cat.pages %}{% if p.days_idle > 14 %}{% set _ = stale.append(p) %}{% endif %}{% endfor %}{% endfor %}
+  {% if stale %}
+    <div class="cat-block stale-section">
+      <h3>⚠ 비활성 페이지 (14일 이상 변경 없음)</h3>
+      {% for p in stale %}
+        <span class="stale-pill">{{ p.title }} · {{ p.days_idle }}일</span>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <div class="cat-block">
+    <h3 style="margin:0 0 8px;color:var(--navy);font-size:0.95rem;">📌 미완 todo 누적 페이지</h3>
+    {% set has_open = false %}
+    {% for cat in data.tree %}{% for p in cat.pages|sort(attribute='activity_recent') %}
+      {% set open_n = p.todos_total - p.todos_done %}
+      {% if open_n >= 3 %}
+        {% set has_open = true %}
+        <div class="page-row" style="grid-template-columns:1fr auto auto;">
+          <span><a href="/think/page/{{ p.path|urlencode }}" style="color:var(--navy);text-decoration:none;font-weight:600;">{{ p.title }}</a></span>
+          <span class="col-val" style="color:#dc2626;">미완 {{ open_n }}</span>
+          <span class="p-meta" style="margin:0;">{{ p.todos_done }}/{{ p.todos_total }} 완료</span>
+        </div>
+      {% endif %}
+    {% endfor %}{% endfor %}
+    {% if not has_open %}<p style="color:var(--muted);font-size:0.86rem;margin:0;">미완 todo 가 누적된 페이지 없음 ✓</p>{% endif %}
+  </div>
+</div>
+</body>
+</html>

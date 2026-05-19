@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="ko"><head>
+{% include "combos/_base_head.html" %}
+<title>Treemap · 면적 비율</title>
+<style>
+  body { background:#f8fafc; }
+  .tm-wrap { padding:20px; }
+  #tm { width:100%; height:calc(100vh - 120px); background:#fff; border-radius:14px; box-shadow:0 4px 14px rgba(0,0,0,0.05); overflow:hidden; position:relative; }
+  .tm-leg { display:flex; gap:18px; justify-content:center; margin-bottom:12px; font-size:0.84rem; color:var(--muted); }
+  .tm-leg .lg { display:inline-flex; align-items:center; gap:6px; }
+  .tm-leg .lg .sw { width:14px; height:14px; border-radius:3px; }
+  .tm-cell {
+    position:absolute; padding:8px 10px; overflow:hidden; cursor:pointer;
+    transition:opacity 0.15s; border:2px solid #fff;
+    display:flex; flex-direction:column;
+  }
+  .tm-cell:hover { opacity:0.85; }
+  .tm-page-label {
+    background:rgba(0,0,0,0.45); color:#fff; padding:6px 10px;
+    font-weight:800; font-size:0.86rem;
+    position:absolute; top:8px; left:8px; border-radius:6px;
+    box-shadow:0 2px 6px rgba(0,0,0,0.2);
+  }
+  .tm-dec-label {
+    color:#fff; font-size:0.74rem; font-weight:700;
+    text-shadow:0 1px 3px rgba(0,0,0,0.5); line-height:1.3;
+    overflow:hidden;
+  }
+  .tm-dec-meta { font-size:0.66rem; opacity:0.85; margin-top:2px; }
+  .tip-tm {
+    position:absolute; background:#1e293b; color:#fff; padding:10px 14px; border-radius:8px;
+    font-size:0.82rem; max-width:300px; pointer-events:none; display:none; z-index:50;
+    line-height:1.5; box-shadow:0 8px 20px rgba(0,0,0,0.3);
+  }
+</style>
+</head><body>
+{% include "tree_vis/_nav.html" %}
+
+<div class="tm-leg">
+  <span class="lg"><span class="sw" style="background:#22c55e;"></span>✅ 구현 완료</span>
+  <span class="lg"><span class="sw" style="background:#f59e0b;"></span>⏳ 진행 중</span>
+  <span class="lg"><span class="sw" style="background:#94a3b8;"></span>📋 계획</span>
+  <span style="margin-left:20px;font-size:0.74rem;color:#64748b;">면적 = 결정 1개 · 페이지 영역은 색 가족</span>
+</div>
+
+<div class="tm-wrap">
+  <div id="tm"></div>
+</div>
+<div class="tip-tm" id="tt"></div>
+
+<script>
+const data = {{ h|tojson }};
+
+const wrap = document.getElementById("tm");
+const W = wrap.getBoundingClientRect().width;
+const H = wrap.getBoundingClientRect().height;
+
+const root = d3.hierarchy(data).sum(d => d.value || 0).sort((a,b) => b.value - a.value);
+d3.treemap().size([W, H]).padding(3).round(true)(root);
+
+function colorFor(d) {
+  if (d.depth === 1) return d.data.color || "#64748b";
+  if (d.data.impl === "shipped") return "#22c55e";
+  if (d.data.impl === "in_progress") return "#f59e0b";
+  return "#94a3b8";
+}
+
+// 페이지 (depth 1) 박스 배경
+root.descendants().filter(d => d.depth === 1).forEach(p => {
+  const div = document.createElement("div");
+  div.className = "tm-cell";
+  div.style.left = p.x0 + "px";
+  div.style.top = p.y0 + "px";
+  div.style.width = (p.x1 - p.x0) + "px";
+  div.style.height = (p.y1 - p.y0) + "px";
+  div.style.background = p.data.color + "22";
+  div.style.borderColor = p.data.color;
+  div.style.borderWidth = "3px";
+  wrap.appendChild(div);
+
+  const lbl = document.createElement("div");
+  lbl.className = "tm-page-label";
+  lbl.style.background = p.data.color;
+  lbl.textContent = `📂 ${p.data.name} · ${p.data.pct}%`;
+  div.appendChild(lbl);
+});
+
+// 결정 (depth 2) 박스
+root.descendants().filter(d => d.depth === 2).forEach(d => {
+  const cell = document.createElement("div");
+  cell.className = "tm-cell";
+  cell.style.left = d.x0 + "px";
+  cell.style.top = d.y0 + "px";
+  cell.style.width = (d.x1 - d.x0) + "px";
+  cell.style.height = (d.y1 - d.y0) + "px";
+  cell.style.background = colorFor(d);
+  cell.style.padding = "8px 10px";
+  cell.style.paddingTop = "40px";  // 페이지 라벨 자리 비우기
+  wrap.appendChild(cell);
+
+  const w = d.x1 - d.x0, h = d.y1 - d.y0;
+  if (w > 60 && h > 40) {
+    const ic = d.data.impl === 'shipped' ? '✅' : d.data.impl === 'in_progress' ? '⏳' : '📋';
+    const lbl = document.createElement("div");
+    lbl.className = "tm-dec-label";
+    lbl.innerHTML = `${ic} ${d.data.name.slice(0, w/8)}`;
+    cell.appendChild(lbl);
+    if (h > 60 && d.data.date) {
+      const meta = document.createElement("div");
+      meta.className = "tm-dec-meta";
+      meta.style.color = "#fff";
+      meta.textContent = d.data.date;
+      cell.appendChild(meta);
+    }
+  }
+
+  cell.addEventListener("mousemove", e => {
+    const tt = document.getElementById("tt");
+    const ic = d.data.impl === 'shipped' ? '✅' : d.data.impl === 'in_progress' ? '⏳' : '📋';
+    tt.innerHTML = `<b>${ic} ${d.data.impl}</b><br>📅 ${d.data.date || '-'}<br>📂 ${d.parent.data.name}<br><br><i>${d.data.full_text || d.data.name}</i>`;
+    tt.style.display = "block";
+    tt.style.left = (e.pageX + 14) + "px";
+    tt.style.top = (e.pageY - 10) + "px";
+  });
+  cell.addEventListener("mouseleave", () => document.getElementById("tt").style.display = "none");
+});
+</script>
+</body></html>

@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+{% include "combos/_base_head.html" %}
+<title>wj · 생각 홈 조합 12개</title>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <span class="brand">wj<span class="dot">.</span></span>
+    {% include "_tabs.html" %}
+    <span class="topright"><a href="/think" style="color:#94a3b8;text-decoration:none;font-size:0.78rem;">← 생각 메인</a> · <a href="/mockups" style="color:#94a3b8;text-decoration:none;font-size:0.78rem;">개별 mockup 6</a></span>
+  </div>
+
+  <div class="cb-wrap" style="text-align:center;">
+    <h1 style="font-size:1.6rem;color:var(--navy);margin:24px 0 4px;">🏠 생각 홈 조합 후보 {{ combos|length }}개</h1>
+    <p style="color:var(--muted);margin:0;font-size:0.92rem;">개별 mockup 6개를 다양한 방식으로 조합한 통합 홈. 카드 클릭 → 실제 화면. 마음에 드는 조합 알려주세요.</p>
+  </div>
+
+  <div class="combo-card-grid">
+    {% for c in combos %}
+      <a class="combo-tile" href="/combos/{{ c.n }}">
+        <span class="code">#{{ c.n }} · {{ c.tag }}</span>
+        <h3>{{ c.code }}</h3>
+        <div class="layout">{{ c.layout }}</div>
+        <p>{{ c.desc }}</p>
+      </a>
+    {% endfor %}
+  </div>
+</div>
+</body>
+</html>

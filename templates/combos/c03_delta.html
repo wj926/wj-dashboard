@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="ko"><head>
+{% include "combos/_base_head.html" %}
+<title>Delta · 결정 흐름 hero</title>
+</head><body>
+{% include "combos/_nav.html" %}
+<div class="cb-wrap">
+  {% include "partials/kpi_bar.html" %}
+
+  <div class="cb-2col-7-3">
+    <div class="cb-card">
+      <h3>🧭 Decision River (hero) <span class="src">#3</span></h3>
+      {% set limit = 20 %}{% include "partials/river_list.html" %}
+    </div>
+    <div class="cb-stack">
+      <div class="cb-card">
+        <h3>📊 진행 파이프라인 <span class="src">#5</span></h3>
+        {% set show_funnel = false %}{% include "partials/pipeline_bars.html" %}
+      </div>
+      <div class="cb-card">
+        <h3>💭 Focus TOP 5 <span class="src">#6</span></h3>
+        {% include "partials/focus_mini.html" %}
+      </div>
+    </div>
+  </div>
+
+  <div class="cb-2col" style="margin-top:14px;">
+    <div class="cb-card">
+      <h3>🔥 활동 히트맵 <span class="src">#2</span></h3>
+      {% set uid = "c3h" %}{% include "partials/heat_strip.html" %}
+    </div>
+    <div class="cb-card">
+      <h3>📂 폴더 활력 <span class="src">#4</span></h3>
+      {% include "partials/tree_list.html" %}
+    </div>
+  </div>
+</div>
+</body></html>

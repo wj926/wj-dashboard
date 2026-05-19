@@ -1,0 +1,18 @@
+{% set limit = limit|default(10) %}
+{% set palette = ['#3b82f6','#10b981','#f59e0b','#a855f7','#ef4444','#ec4899','#06b6d4','#84cc16'] %}
+<div class="rv">
+{% for d in data.decisions_all[:limit] %}
+  {% set col = palette[data.page_color.get(d.page_title, 0)] %}
+  {% set _row %}
+    <div class="item {% if d.page_path %}linkable{% endif %} {% if d.is_dropped %}dropped{% endif %}">
+      <span class="dt">{{ d.date or '—' }}</span>
+      <span class="dot" style="background:{{ col }}"></span>
+      <div>
+        <span class="pchip" style="background:{{ col }}1f;color:{{ col }};">{{ d.page_title }}</span>
+        <span class="tx">{{ d.decision[:90] }}{% if d.decision|length > 90 %}…{% endif %}</span>
+      </div>
+    </div>
+  {% endset %}
+  {% if d.page_path %}<a class="card-link" href="/think/page/{{ d.page_path|urlencode }}">{{ _row|safe }}</a>{% else %}{{ _row|safe }}{% endif %}
+{% endfor %}
+</div>

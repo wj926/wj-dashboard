@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="ko"><head>
+{% include "combos/_base_head.html" %}
+<title>Org Chart · 수직 박스 트리</title>
+<style>
+  body { background:#f8fafc; }
+  .org-wrap { padding:30px 24px 50px; overflow-x:auto; }
+  .org { display:flex; flex-direction:column; align-items:center; min-width:1400px; margin:0 auto; }
+
+  /* root */
+  .org-root {
+    background:linear-gradient(135deg,var(--navy),#0f172a); color:#fff;
+    padding:16px 32px; border-radius:14px; font-weight:800; font-size:1.05rem;
+    box-shadow:0 8px 20px rgba(0,0,0,0.2); margin-bottom:0;
+    text-align:center; min-width:240px;
+  }
+  .org-root .stats { font-size:0.78rem; font-weight:400; opacity:0.8; margin-top:4px; }
+
+  /* connector lines between levels */
+  .v-line { width:2px; height:30px; background:#cbd5e1; }
+  .h-line-wrap { display:flex; justify-content:center; }
+  .h-line { height:2px; background:#cbd5e1; }
+
+  /* page level */
+  .pages-row { display:flex; gap:30px; justify-content:center; align-items:flex-start; }
+  .page-col { display:flex; flex-direction:column; align-items:center; flex:1; min-width:240px; max-width:340px; }
+
+  .page-box {
+    background:#fff; border-radius:12px; padding:16px 18px;
+    box-shadow:0 4px 14px rgba(0,0,0,0.08);
+    border-top:5px solid var(--p-color); min-width:200px; text-align:center;
+    transition:transform 0.15s;
+  }
+  .page-box:hover { transform:translateY(-2px); box-shadow:0 8px 22px rgba(0,0,0,0.12); }
+  .page-box .pn { font-weight:800; font-size:0.98rem; color:var(--navy); margin-bottom:6px; }
+  .page-box .pp { font-size:0.78rem; color:var(--muted); margin-bottom:8px; }
+  .page-box .pbar { height:10px; background:#e2e8f0; border-radius:5px; overflow:hidden; display:flex; }
+  .page-box .pbar .s { background:#16a34a; }
+  .page-box .pbar .p { background:#f59e0b; }
+  .page-box .pbar .x { background:#cbd5e1; }
+  .page-box .pct { font-size:1.3rem; font-weight:800; color:var(--p-color); margin-top:6px; }
+
+  /* decisions under page */
+  .dec-stack { display:flex; flex-direction:column; gap:6px; margin-top:0; align-items:center; }
+  .dec-stack .v-mini { width:2px; height:14px; background:#cbd5e1; }
+  .dec-box {
+    background:#fff; padding:8px 12px; border-radius:8px; font-size:0.78rem;
+    box-shadow:0 2px 6px rgba(0,0,0,0.05); border-left:4px solid var(--d-color);
+    max-width:260px; line-height:1.45;
+    display:flex; align-items:center; gap:8px; cursor:default;
+    transition:transform 0.1s;
+  }
+  .dec-box:hover { transform:translateX(2px); box-shadow:0 4px 10px rgba(0,0,0,0.1); }
+  .dec-box.shipped { --d-color:#16a34a; background:linear-gradient(90deg,#f0fdf4,#fff); }
+  .dec-box.in_progress { --d-color:#f59e0b; background:linear-gradient(90deg,#fffbeb,#fff); }
+  .dec-box.planned { --d-color:#cbd5e1; background:#fafbfc; }
+  .dec-box .ic { flex-shrink:0; font-size:0.9rem; }
+  .dec-box .dt { font-size:0.66rem; color:var(--muted); font-family:ui-monospace,Menlo,monospace; flex-shrink:0; }
+  .dec-box .txt { flex:1; color:#243038; }
+
+  .legend-bar {
+    display:flex; gap:18px; justify-content:center; margin:20px auto 30px;
+    font-size:0.84rem; color:var(--muted);
+  }
+  .legend-bar .lg { display:inline-flex; align-items:center; gap:6px; }
+  .legend-bar .lg .sw { width:14px; height:14px; border-radius:3px; }
+</style>
+</head><body>
+{% include "tree_vis/_nav.html" %}
+
+<div class="legend-bar">
+  <span class="lg"><span class="sw" style="background:#16a34a;"></span>✅ 구현 완료</span>
+  <span class="lg"><span class="sw" style="background:#f59e0b;"></span>⏳ 진행 중</span>
+  <span class="lg"><span class="sw" style="background:#cbd5e1;"></span>📋 계획</span>
+</div>
+
+<div class="org-wrap">
+  <div class="org">
+    <div class="org-root">
+      🧠 {{ h.name }}
+      <div class="stats">{{ h.stats.total }} 결정 · {{ h.stats.shipped }} 완료 · {{ h.stats.in_progress }} 진행 · {{ h.stats.planned }} 계획</div>
+    </div>
+
+    <div class="v-line"></div>
+    <div class="h-line" style="width:{{ (h.children|length - 1) * 320 + 200 }}px;"></div>
+
+    <div class="pages-row" style="margin-top:0;">
+      {% for p in h.children %}
+        <div class="page-col">
+          <div class="v-line" style="margin-top:-1px;"></div>
+          <div class="page-box" style="--p-color:{{ p.color }};">
+            <div class="pn">📂 {{ p.name }}</div>
+            <div class="pp">결정 {{ p.total }} · 완료 {{ p.shipped }}/{{ p.total }}</div>
+            <div class="pbar">
+              {% if p.shipped %}<div class="s" style="width:{{ (100*p.shipped/p.total)|round }}%"></div>{% endif %}
+              {% if p.in_progress %}<div class="p" style="width:{{ (100*p.in_progress/p.total)|round }}%"></div>{% endif %}
+              {% if p.planned %}<div class="x" style="width:{{ (100*p.planned/p.total)|round }}%"></div>{% endif %}
+            </div>
+            <div class="pct">{{ p.pct }}%</div>
+          </div>
+
+          <div class="dec-stack">
+            {% for d in p.children %}
+              <div class="v-mini"></div>
+              <div class="dec-box {{ d.impl }}">
+                <span class="ic">{% if d.impl == 'shipped' %}✅{% elif d.impl == 'in_progress' %}⏳{% else %}📋{% endif %}</span>
+                <span class="dt">{{ d.date or '—' }}</span>
+                <span class="txt">{{ d.name[:50] }}{% if d.name|length > 50 %}…{% endif %}</span>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+</body></html>

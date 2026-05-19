@@ -1,0 +1,16 @@
+{% set period = period|default('7d') %}
+{% set topics = data.top_7d if period == '7d' else data.top_30d %}
+<div class="hot">
+{% if topics %}
+  {% set mx = topics[0][1] %}
+  {% for t, s in topics %}
+    <div class="row">
+      <span class="nm">{{ t }}</span>
+      <div class="br"><div style="width:{{ (s/mx*100)|round }}%"></div></div>
+      <span class="vl">{{ s }}</span>
+    </div>
+  {% endfor %}
+{% else %}
+  <p style="color:var(--muted);font-size:0.82rem;">활동 없음</p>
+{% endif %}
+</div>

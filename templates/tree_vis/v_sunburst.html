@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="ko"><head>
+{% include "combos/_base_head.html" %}
+<title>Sunburst · 방사형</title>
+<style>
+  body { background:#0e1626; color:#e2e8f0; }
+  .sb-wrap { display:grid; grid-template-columns:1fr 320px; gap:20px; padding:20px; height:calc(100vh - 60px); }
+  @media(max-width:900px){ .sb-wrap{ grid-template-columns:1fr; height:auto;} }
+  #sun { background:#1e293b; border-radius:14px; display:flex; align-items:center; justify-content:center; }
+  #sun svg { display:block; max-width:100%; max-height:100%; }
+  .sun-side { background:#1e293b; border-radius:14px; padding:20px; overflow-y:auto; }
+  .sun-side h2 { margin:0 0 10px; color:#f1f5f9; font-size:1rem; border-bottom:1px solid #334155; padding-bottom:8px; }
+  .sun-side .meta { font-size:0.86rem; color:#cbd5e1; line-height:1.6; }
+  .sun-side .meta b { color:#fff; }
+  .sun-side .stats { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:12px; }
+  .sun-side .stats > div { background:#0f172a; padding:10px; border-radius:8px; text-align:center; }
+  .sun-side .stats b { font-size:1.3rem; color:#fff; display:block; }
+  .sun-side .stats span { font-size:0.66rem; color:#94a3b8; }
+  path { cursor:pointer; transition:opacity 0.15s; }
+  path:hover { opacity:0.85; }
+  text { pointer-events:none; }
+</style>
+</head><body>
+{% include "tree_vis/_nav.html" %}
+<div class="sb-wrap">
+  <div id="sun"><svg></svg></div>
+  <aside class="sun-side">
+    <h2 id="s-title">{{ h.name }}</h2>
+    <div class="meta" id="s-meta">
+      전체 결정 <b>{{ h.stats.total }}</b><br>
+      ✅ 완료 <b>{{ h.stats.shipped }}</b> · ⏳ 진행 <b>{{ h.stats.in_progress }}</b> · 📋 계획 <b>{{ h.stats.planned }}</b>
+      <br><br>
+      <span style="font-size:0.78rem;color:#94a3b8;">중앙 = thinking 시스템. 안쪽 링 = 페이지(색깔). 바깥 링 = 결정 (구현 상태별 색). 호 길이 = 결정 수 비율.</span>
+    </div>
+    <div class="stats">
+      <div><b style="color:#22c55e;">{{ h.stats.shipped }}</b><span>✅ shipped</span></div>
+      <div><b style="color:#f59e0b;">{{ h.stats.in_progress }}</b><span>⏳ in_prog</span></div>
+      <div><b style="color:#94a3b8;">{{ h.stats.planned }}</b><span>📋 planned</span></div>
+      <div><b style="color:#fff;">{{ (100*h.stats.shipped/h.stats.total)|round }}%</b><span>구현률</span></div>
+    </div>
+    <div style="margin-top:16px;padding:10px;background:#0f172a;border-radius:8px;font-size:0.78rem;color:#cbd5e1;">
+      🖱 호 hover → 상세 표시
+    </div>
+  </aside>
+</div>
+
+<script>
+const data = {{ h|tojson }};
+
+const sunWrap = document.getElementById("sun");
+const wb = sunWrap.getBoundingClientRect();
+const size = Math.min(wb.width, wb.height) - 20;
+const radius = size / 2;
+const svg = d3.select("#sun svg").attr("viewBox", `${-radius} ${-radius} ${size} ${size}`).attr("width", size).attr("height", size);
+
+const root = d3.hierarchy(data).sum(d => d.value || 0).sort((a,b) => b.value - a.value);
+const partition = d3.partition().size([2 * Math.PI, radius]);
+partition(root);
+
+function colorFor(d) {
+  if (d.depth === 0) return "#1e293b";
+  if (d.depth === 1) return d.data.color || "#64748b";
+  // depth 2 = decision
+  if (d.data.impl === "shipped") return "#22c55e";
+  if (d.data.impl === "in_progress") return "#f59e0b";
+  return "#94a3b8";
+}
+
+const arc = d3.arc()
+  .startAngle(d => d.x0)
+  .endAngle(d => d.x1)
+  .innerRadius(d => d.y0)
+  .outerRadius(d => d.y1)
+  .padAngle(0.005);
+
+svg.selectAll("path").data(root.descendants()).join("path")
+  .attr("d", arc)
+  .attr("fill", d => colorFor(d))
+  .attr("stroke", "#0e1626")
+  .attr("stroke-width", 1)
+  .on("mouseenter", (e, d) => {
+    document.getElementById("s-title").textContent = d.data.name;
+    let html = "";
+    if (d.data.type === "page") {
+      html = `📂 페이지<br>결정 <b>${d.data.total}</b> · 완료 <b>${d.data.shipped}/${d.data.total}</b> (<b>${d.data.pct}%</b>)`;
+    } else if (d.data.type === "decision") {
+      const icn = d.data.impl === "shipped" ? "✅" : d.data.impl === "in_progress" ? "⏳" : "📋";
+      html = `${icn} ${d.data.impl}<br>📅 ${d.data.date || '-'}<br>📂 ${d.parent.data.name}<br><br><i style="color:#94a3b8;">${d.data.full_text || d.data.name}</i>`;
+    } else {
+      html = `🧠 전체 시스템`;
+    }
+    document.getElementById("s-meta").innerHTML = html;
+  });
+
+// labels for pages (depth 1)
+svg.selectAll("text").data(root.descendants().filter(d => d.depth === 1)).join("text")
+  .attr("transform", d => {
+    const angle = (d.x0 + d.x1) / 2;
+    const r = (d.y0 + d.y1) / 2;
+    const x = Math.cos(angle - Math.PI/2) * r;
+    const y = Math.sin(angle - Math.PI/2) * r;
+    const rot = angle * 180 / Math.PI - 90;
+    return `translate(${x},${y}) rotate(${rot < -90 ? rot + 180 : rot})`;
+  })
+  .attr("text-anchor","middle")
+  .attr("dy", 4)
+  .attr("fill","#fff")
+  .attr("font-weight", 800)
+  .attr("font-size","11px")
+  .text(d => d.data.name.length > 10 ? d.data.name.slice(0,9) + "…" : d.data.name);
+
+// center label
+svg.append("text").attr("text-anchor","middle").attr("dy",-2).attr("fill","#fff").attr("font-weight",800).attr("font-size","13px").text("🧠");
+svg.append("text").attr("text-anchor","middle").attr("dy",14).attr("fill","#94a3b8").attr("font-size","9px").text("thinking");
+</script>
+</body></html>

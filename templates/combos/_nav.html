@@ -1,0 +1,10 @@
+<div class="cb-header">
+  <span><a href="/combos">← 12개 다 보기</a> · <a href="/mockups">개별 mockup 6</a></span>
+  <span class="name">{{ meta.code }} <span style="font-weight:400;color:var(--muted);">— {{ meta.tag }}</span></span>
+  <span>
+    {% set prev = n - 1 if n > 1 else combos|length %}
+    {% set nxt = n + 1 if n < combos|length %}{% if n >= combos|length %}{% set nxt = 1 %}{% endif %}
+    <a href="/combos/{{ prev }}">‹ {{ combos[prev-1].code }}</a>
+    <a href="/combos/{{ nxt }}">{{ combos[nxt-1].code }} ›</a>
+  </span>
+</div>

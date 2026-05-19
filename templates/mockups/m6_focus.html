@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mockup 6 · 지금 머릿속 Focus Cards</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}?v=15">
+<style>
+  body{background:linear-gradient(135deg,#f1f4f8,#e9ecf3);min-height:100vh;}
+  .mk-header{max-width:1100px;margin:14px auto;padding:0 24px;display:flex;justify-content:space-between;align-items:center;color:#475569;font-size:0.86rem;}
+  .mk-header a{color:var(--think);text-decoration:none;margin:0 8px;}
+  .mk-title b{color:var(--navy);}
+  .mk-wrap{max-width:1100px;margin:0 auto;padding:0 24px 40px;}
+  .hero{text-align:center;margin:24px 0;}
+  .hero h1{font-size:1.6rem;color:var(--navy);margin:0;}
+  .hero p{color:var(--muted);font-size:0.9rem;margin:6px 0 0;}
+
+  .cards{display:grid;grid-template-columns:1fr;gap:16px;}
+  .fc{background:#fff;border-radius:16px;padding:22px 24px;box-shadow:0 6px 20px rgba(0,0,0,0.06);display:grid;grid-template-columns:60px 1fr 200px;gap:20px;align-items:center;position:relative;overflow:hidden;}
+  .fc::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;background:var(--rank-color);}
+  .fc.rank-1{--rank-color:#dc2626;}
+  .fc.rank-2{--rank-color:#ea580c;}
+  .fc.rank-3{--rank-color:#d97706;}
+  .fc.rank-4{--rank-color:#65a30d;}
+  .fc.rank-5{--rank-color:#0891b2;}
+  .fc-rank{font-size:2.4rem;font-weight:800;color:var(--rank-color);text-align:center;line-height:1;}
+  .fc-rank small{display:block;font-size:0.6rem;color:var(--muted);font-weight:600;margin-top:4px;text-transform:uppercase;}
+  .fc-title{font-size:1.2rem;color:var(--navy);font-weight:800;margin-bottom:6px;}
+  .fc-title a{color:var(--navy);text-decoration:none;}
+  .fc-meta{display:flex;gap:14px;font-size:0.78rem;color:var(--muted);margin-bottom:8px;flex-wrap:wrap;}
+  .fc-meta b{color:#243038;font-weight:700;}
+  .fc-recent{background:#f8fafc;border-radius:8px;padding:10px 12px;font-size:0.84rem;color:#243038;line-height:1.5;border-left:3px solid var(--think);}
+  .fc-recent .stamp{font-size:0.7rem;color:var(--muted);margin-right:6px;font-family:ui-monospace,Menlo,monospace;}
+  .fc-score{text-align:center;}
+  .fc-score .num{font-size:2.2rem;font-weight:800;color:var(--rank-color);line-height:1;}
+  .fc-score .lbl{font-size:0.66rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-top:3px;}
+  .fc-score .bar{height:8px;background:#e2e8f0;border-radius:4px;margin-top:8px;overflow:hidden;}
+  .fc-score .bar > div{height:100%;background:var(--rank-color);border-radius:4px;}
+  .fc-empty{background:#fafbfc;border:2px dashed #cbd5e1;color:var(--muted);text-align:center;padding:30px;border-radius:16px;font-size:0.9rem;}
+  .fc-next{margin-top:8px;font-size:0.82rem;color:#15803d;}
+  .formula{max-width:1100px;margin:24px auto 0;padding:0 24px;}
+  .formula-card{background:#fff;border-radius:12px;padding:16px 20px;font-size:0.8rem;color:var(--muted);line-height:1.6;box-shadow:0 4px 12px rgba(0,0,0,0.04);}
+  .formula-card code{background:#f1f5f9;padding:1px 6px;border-radius:4px;font-family:ui-monospace,Menlo,monospace;color:#243038;}
+</style>
+</head>
+<body>
+<div class="mk-header">
+  <span><a href="/mockups">← 6개 다 보기</a></span>
+  <span class="mk-title">Mockup 6 / 6 · <b>지금 머릿속 Focus Cards</b></span>
+  <span><a href="/mockups/5">‹ 5</a><a href="/mockups/1">1 ›</a></span>
+</div>
+
+<div class="mk-wrap">
+  <div class="hero">
+    <h1>💭 지금 머릿속 TOP 5</h1>
+    <p>최근 14일 활동 가중 점수 기준. 카드 클릭 → 페이지 상세.</p>
+  </div>
+
+  {% set top5 = data.focus[:5] %}
+  {% set max_score = top5[0].score if top5 else 1 %}
+
+  <div class="cards">
+    {% for f in top5 %}
+      <div class="fc rank-{{ loop.index }}">
+        <div class="fc-rank">#{{ loop.index }}<small>RANK</small></div>
+        <div>
+          <div class="fc-title"><a href="/think/page/{{ f.path|urlencode }}">{{ f.title }}</a></div>
+          <div class="fc-meta">
+            <span>📅 갱신 <b>{{ f.updated }}</b></span>
+            <span>🧭 결정 <b>{{ f.decisions }}</b></span>
+            <span>❓ 열린 질문 <b>{{ '있음' if f.open_questions_chars > 30 else '-' }}</b></span>
+            <span>📌 미완 todo <b>{{ f.todos_open }}</b></span>
+          </div>
+          {% if f.last_decision %}
+            <div class="fc-recent">
+              <span class="stamp">{{ f.last_decision.date or '-' }}</span>{{ f.last_decision.decision }}
+            </div>
+          {% endif %}
+          {% if f.todos_open > 0 %}
+            <div class="fc-next">▶ 다음 액션: 미완 todo {{ f.todos_open }}건 확인</div>
+          {% endif %}
+        </div>
+        <div class="fc-score">
+          <div class="num">{{ f.score|round(0)|int }}</div>
+          <div class="lbl">집중도</div>
+          <div class="bar"><div style="width:{{ (f.score/max_score*100)|round }}%"></div></div>
+        </div>
+      </div>
+    {% endfor %}
+
+    {% for i in range(5 - top5|length) %}
+      <div class="fc-empty">슬롯 #{{ top5|length + loop.index }} (비어있음) — 더 많은 페이지를 만들면 채워집니다</div>
+    {% endfor %}
+  </div>
+
+  <div class="formula">
+    <div class="formula-card">
+      <b>집중도 공식</b> · 페이지의 일자별 활동 점수 (결정×3 + 타임라인×2) 를 최근 14일 안에서 합산하되,
+      <code>가중치 = 1 − (오늘로부터 일수 / 14)</code> 로 가까운 날일수록 가중.
+      <br><br>
+      <b>왜 14일?</b> — 1주는 너무 짧고 1달은 옛 이야기. 2주가 "지금 빠져있는 것" 의 자연 단위.
+      바꿀 수 있음.
+    </div>
+  </div>
+</div>
+</body>
+</html>

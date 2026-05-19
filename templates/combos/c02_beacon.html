@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="ko"><head>
+{% include "combos/_base_head.html" %}
+<title>Beacon · 시간 흐름 hero</title>
+</head><body>
+{% include "combos/_nav.html" %}
+<div class="cb-wrap">
+  {% include "partials/kpi_bar.html" %}
+
+  <div class="cb-2col-7-3">
+    <div class="cb-stack">
+      <div class="cb-card">
+        <h3>🔥 활동 히트맵 (hero) <span class="src">#2</span></h3>
+        {% set uid = "c2h" %}{% include "partials/heat_strip.html" %}
+        <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px;">
+          <h3 style="border:none;padding:0;margin:0 0 8px;">📈 최근 30일 핫토픽</h3>
+          {% set period = "30d" %}{% include "partials/hot_topics.html" %}
+        </div>
+      </div>
+    </div>
+    <div class="cb-stack">
+      <div class="cb-card">
+        <h3>💭 Focus TOP 3 <span class="src">#6</span></h3>
+        {% set limit = 3 %}{% include "partials/focus_mini.html" %}
+      </div>
+      <div class="cb-card">
+        <h3>📊 진행도 <span class="src">#5</span></h3>
+        {% set show_funnel = false %}{% include "partials/pipeline_bars.html" %}
+      </div>
+      <div class="cb-card">
+        <h3>🧭 최근 결정 5 <span class="src">#3</span></h3>
+        {% set limit = 5 %}{% include "partials/river_list.html" %}
+      </div>
+    </div>
+  </div>
+</div>
+</body></html>

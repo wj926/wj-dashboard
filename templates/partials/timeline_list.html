@@ -1,0 +1,16 @@
+{% set limit = limit|default(15) %}
+<div class="rv">
+{% for e in data.all_timeline[:limit] %}
+  {% set _row %}
+    <div class="item {% if e.page_path %}linkable{% endif %}">
+      <span class="dt">{{ e.date or '—' }}</span>
+      <span class="dot" style="background:#a855f7"></span>
+      <div>
+        <span class="pchip" style="background:#a855f71f;color:#a855f7;">{{ e.page_title }}</span>
+        <span class="tx">{{ e.text[:100]|striptags }}{% if e.text|length > 100 %}…{% endif %}</span>
+      </div>
+    </div>
+  {% endset %}
+  {% if e.page_path %}<a class="card-link" href="/think/page/{{ e.page_path|urlencode }}">{{ _row|safe }}</a>{% else %}{{ _row|safe }}{% endif %}
+{% endfor %}
+</div>

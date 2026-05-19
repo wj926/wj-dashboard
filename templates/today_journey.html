@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>📍 오늘 정리 — 2026-05-17</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}?v=15">
+<style>
+  body { background:#f1f4f8; color:#1e293b; }
+  .tj-top { background:var(--navy); color:#fff; padding:12px 24px; }
+  .tj-top a { color:#cbd5e1; text-decoration:none; }
+  .tj-top a:hover { color:#fff; }
+  .tj-wrap { max-width:920px; margin:30px auto; padding:0 24px 60px; }
+  .tj-hero h1 { font-size:1.8rem; color:var(--navy); margin:0 0 8px; }
+  .tj-hero p { color:var(--muted); font-size:0.95rem; margin:0 0 30px; line-height:1.6; }
+
+  .stage {
+    position:relative; padding:0 0 26px 36px; border-left:3px solid var(--border);
+  }
+  .stage:last-child { border-color:transparent; }
+  .stage::before {
+    content:""; position:absolute; left:-9px; top:8px;
+    width:15px; height:15px; border-radius:50%; background:var(--think);
+    border:3px solid #fff; box-shadow:0 0 0 2px var(--think);
+  }
+  .stage.shipped::before { background:#16a34a; box-shadow:0 0 0 2px #16a34a; }
+  .stage.current::before { background:#dc2626; box-shadow:0 0 0 2px #dc2626; animation:pulse 1.5s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.5;} }
+
+  .stage h2 { margin:0 0 6px; font-size:1.05rem; color:var(--navy); display:flex; align-items:center; gap:8px; }
+  .stage h2 .num {
+    background:var(--think); color:#fff; font-size:0.74rem; padding:2px 9px;
+    border-radius:8px; font-weight:800;
+  }
+  .stage.shipped h2 .num { background:#16a34a; }
+  .stage.current h2 .num { background:#dc2626; }
+  .stage .ts { font-size:0.7rem; color:var(--muted); font-family:ui-monospace,Menlo,monospace; }
+
+  .quote {
+    background:#fff; border-left:4px solid var(--think); border-radius:0 8px 8px 0;
+    padding:10px 14px; margin:10px 0; font-size:0.88rem; color:#243038;
+    font-style:italic; line-height:1.55;
+  }
+  .quote::before { content:"💬 "; opacity:0.5; font-style:normal; }
+
+  .links {
+    background:#fff; border:1px solid var(--border); border-radius:10px;
+    padding:12px 16px; margin:10px 0;
+  }
+  .links .lh { font-size:0.74rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px; font-weight:700; }
+  .links a { display:block; padding:6px 8px; border-radius:5px; text-decoration:none; color:var(--navy); font-size:0.88rem; }
+  .links a:hover { background:#f1f5f9; }
+  .links a .url { font-family:ui-monospace,Menlo,monospace; font-size:0.74rem; color:var(--think); margin-left:8px; }
+  .links a .desc { font-size:0.74rem; color:var(--muted); display:block; margin-top:2px; }
+
+  .note {
+    background:#fef3c7; border-left:3px solid #f59e0b; padding:8px 14px;
+    border-radius:0 6px 6px 0; font-size:0.82rem; color:#78350f; margin:8px 0;
+  }
+  .next { background:#dbeafe; border-color:#3b82f6; color:#1e40af; }
+
+  .toc {
+    background:#fff; border:1px solid var(--border); border-radius:12px;
+    padding:18px 22px; margin-bottom:30px;
+  }
+  .toc h3 { margin:0 0 10px; font-size:0.9rem; color:var(--navy); }
+  .toc ol { margin:0; padding-left:22px; }
+  .toc li { padding:3px 0; font-size:0.86rem; }
+  .toc li a { color:var(--navy); text-decoration:none; }
+  .toc li a:hover { color:var(--think); }
+</style>
+</head>
+<body>
+
+<div class="tj-top">
+  <a href="/think">← 생각 메인</a> ·
+  <a href="/">업무 대시보드</a>
+</div>
+
+<div class="tj-wrap">
+  <div class="tj-hero">
+    <h1>📍 오늘 정리 · 2026-05-17</h1>
+    <p>[생각] 시각화부터 챗봇·구현 추적까지, 오늘 만든 mockup 다 한 페이지에. 사용자 요청 → 산출물 → 채택 여부 흐름대로.</p>
+  </div>
+
+  <div class="toc">
+    <h3>📑 목차</h3>
+    <ol>
+      <li><a href="#s1">[생각] 탭 초안 — 옵시디언 흡수</a></li>
+      <li><a href="#s2">"누가 봐도 읽기 힘들어" → 6개 시각화 mockup</a></li>
+      <li><a href="#s3">"엄청 많이 조합해줘" → 12개 통합 홈 후보</a></li>
+      <li><a href="#s4">Spotlight 채택 → 관계망·날짜별 추가</a></li>
+      <li><a href="#s5">"챗봇이 있어야해" → 5개 위치 변형</a></li>
+      <li><a href="#s6">"대화가 되어야해" → 실 동작 챗봇</a></li>
+      <li><a href="#s7">"입력창 따로, 컨텍스트 모드" → 풀스크린 챗봇</a></li>
+      <li><a href="#s8">"구현 추적도 필요" → 평면 막대</a></li>
+      <li><a href="#s9">"트리 구조로 보여줘" → 5종 텍스트 트리</a></li>
+      <li><a href="#s10">"더 시각화 해줘" → 5종 시각 트리</a></li>
+      <li><a href="#s11">📌 지금 상태 + 다음 결정</a></li>
+    </ol>
+  </div>
+
+  <!-- ============================== -->
+  <div class="stage shipped" id="s1">
+    <span class="ts">대화 시작 ~ 04:51</span>
+    <h2><span class="num">1</span>[생각] 탭 초안</h2>
+    <div class="quote">옵시디언 같은 거 활용해서 생각 정리하고 싶어. wj 대시보드에 [생각] 탭 만들어줘.</div>
+    <div class="links">
+      <div class="lh">🟢 채택 (운영 중)</div>
+      <a href="/think">→ /think <span class="url">옛 3-패널 (사이드+결정+타임라인)</span><span class="desc">현재 메인 — 곧 Spotlight 로 교체 예정</span></a>
+    </div>
+  </div>
+
+  <div class="stage shipped" id="s2">
+    <span class="ts">~ 05:02</span>
+    <h2><span class="num">2</span>"누가 봐도 읽기 힘들어" → 6개 시각화 mockup</h2>
+    <div class="quote">지금 뭐가 어떻게 됐는지 하나도 알 수가 없어. 최근에 뭘 많이 생각? 과거에 뭘? 요즘 빠져있는 건? 어디까지 진행? 한눈에 보고 싶어. 6개 정도 mockup 만들어줘.</div>
+    <div class="links">
+      <div class="lh">🟢 6개 mockup (전부 동작)</div>
+      <a href="/mockups">→ /mockups <span class="url">인덱스 (6개 카드)</span></a>
+      <a href="/mockups/1">→ /mockups/1 <span class="url">① Link Constellation (d3 그래프)</span></a>
+      <a href="/mockups/2">→ /mockups/2 <span class="url">② Heat Calendar (180일 히트맵)</span></a>
+      <a href="/mockups/3">→ /mockups/3 <span class="url">③ Decision River (결정 30개 흐름)</span></a>
+      <a href="/mockups/4">→ /mockups/4 <span class="url">④ Folder Pulse Tree</span></a>
+      <a href="/mockups/5">→ /mockups/5 <span class="url">⑤ Pipeline 5단계</span></a>
+      <a href="/mockups/6">→ /mockups/6 <span class="url">⑥ Focus Cards TOP 5</span></a>
+    </div>
+  </div>
+
+  <div class="stage shipped" id="s3">
+    <span class="ts">~ 05:30</span>
+    <h2><span class="num">3</span>"엄청 많이 조합해줘" → 12개 통합 홈</h2>
+    <div class="quote">6개를 조합해서 통합 홈 예시 엄청나게 만들어줘. 내가 고를거야.</div>
+    <div class="links">
+      <div class="lh">🟢 12개 조합 (Codex 와 회의 후)</div>
+      <a href="/combos">→ /combos <span class="url">인덱스 (12개 카드)</span></a>
+      <a href="/combos/1">→ /combos/1 <span class="url">Cockpit (6위젯 mosaic)</span></a>
+      <a href="/combos/2">→ /combos/2 <span class="url">Beacon (Heat hero)</span></a>
+      <a href="/combos/3">→ /combos/3 <span class="url">Delta (River hero)</span></a>
+      <a href="/combos/4">→ /combos/4 <span class="url">Orbit (Graph hero)</span></a>
+      <a href="/combos/5">→ /combos/5 <span class="url">Funnel (Pipeline hero)</span></a>
+      <a href="/combos/6">→ /combos/6 <span class="url">Arbor (사이드바)</span></a>
+      <a href="/combos/7">→ /combos/7 <span class="url">Trinity (옵시디언 3패널)</span></a>
+      <a href="/combos/8">→ /combos/8 <span class="url">Panorama (4탭)</span></a>
+      <a href="/combos/9">→ /combos/9 <span class="url">⭐ Spotlight (Focus 크게) — 채택됨</span></a>
+      <a href="/combos/10">→ /combos/10 <span class="url">Compass (iPad 최적)</span></a>
+      <a href="/combos/11">→ /combos/11 <span class="url">Mosaic (위젯 9개)</span></a>
+      <a href="/combos/12">→ /combos/12 <span class="url">Archive (회고)</span></a>
+    </div>
+  </div>
+
+  <div class="stage shipped" id="s4">
+    <span class="ts">~ 05:50</span>
+    <h2><span class="num">4</span>Spotlight 채택 + 관계망·날짜별 추가</h2>
+    <div class="quote">스포트라이트 좋은데, 관계망이랑 날짜별 생각도 아래에 작게 추가해줘. 지금 구조로 바로 가능?</div>
+    <div class="note">답: <b>스키마 변경 0건, 바로 가능</b> — thinking_compute 가 이미 graph/timeline/heat 다 노출</div>
+    <div class="links">
+      <div class="lh">🟢 보강된 Spotlight</div>
+      <a href="/combos/9">→ /combos/9 <span class="url">Focus + River + 관계망 + 날짜별 + Pipeline</span></a>
+    </div>
+  </div>
+
+  <div class="stage shipped" id="s5">
+    <span class="ts">~ 06:10</span>
+    <h2><span class="num">5</span>"챗봇이 있어야해" → 5개 위치 변형</h2>
+    <div class="quote">스포트라이트에 입력창도 있어야해. 막 이야기할거거든. 챗봇 위치 안 몇 개 제시해줘.</div>
+    <div class="links">
+      <div class="lh">🟡 5개 위치 mockup (위치 결정 보류)</div>
+      <a href="/chat-spots">→ /chat-spots <span class="url">인덱스</span></a>
+      <a href="/chat-spots/a">→ A <span class="url">우측 [River|Chat] 탭 토글</span></a>
+      <a href="/chat-spots/b">→ B <span class="url">하단 sticky panel</span></a>
+      <a href="/chat-spots/c">→ C <span class="url">떠다니는 모달</span></a>
+      <a href="/chat-spots/d">→ D <span class="url">우측 drawer</span></a>
+      <a href="/chat-spots/e">→ E <span class="url">상단 hero</span></a>
+    </div>
+  </div>
+
+  <div class="stage shipped" id="s6">
+    <span class="ts">~ 08:50</span>
+    <h2><span class="num">6</span>"대화가 되어야해" → 실 동작 챗봇</h2>
+    <div class="quote">이게 대화가 되어야 해! 일방적으로 내가 입력하는 게 아니라!</div>
+    <div class="links">
+      <div class="lh">🟢 진짜 동작 (Claude Opus + raw 자동 저장)</div>
+      <a href="/chat-spots/a">→ /chat-spots/a~e <span class="url">5개 다 진짜 대화 가능</span><span class="desc">⌘+Enter 전송 · raw/2026-05-17.md 자동 append</span></a>
+    </div>
+  </div>
+
+  <div class="stage shipped" id="s7">
+    <span class="ts">~ 09:30</span>
+    <h2><span class="num">7</span>"입력창 따로 + 컨텍스트 모드" → 풀스크린 챗봇</h2>
+    <div class="quote">입력창을 따로 어딘가 들어가게. 대화가 길어질 수도 있고. 특정 페이지 클릭하면 그 페이지 보면서 대화할 수 있어야 해.</div>
+    <div class="note">Codex 와 깊게 회의 → 결론: 별도 페이지 + 컨텍스트는 좌패널 우채팅 분할</div>
+    <div class="links">
+      <div class="lh">🟢 풀스크린 챗봇 (전역 + 컨텍스트)</div>
+      <a href="/think/chat">→ /think/chat <span class="url">전역 모드 (좌 세션 + 메인 대화)</span></a>
+      <a href="/think/chat/page/wiki/%EC%8B%9C%EC%8A%A4%ED%85%9C/wj-%EC%95%B1/wj-%EC%95%B1.md">→ /think/chat/page/wiki/시스템/wj-앱/wj-앱.md <span class="url">📌 wj 앱 컨텍스트</span></a>
+      <a href="/think/chat/page/wiki/%EC%8B%9C%EC%8A%A4%ED%85%9C/%EB%85%BC%EB%AC%B8-%EA%B4%80%EB%A6%AC-%EC%8B%9C%EC%8A%A4%ED%85%9C.md">→ /think/chat/page/...논문 관리... <span class="url">📌 논문 관리</span></a>
+      <a href="/think/chat/page/wiki/%EC%8B%9C%EC%8A%A4%ED%85%9C/%EC%97%85%EB%AC%B4-%EB%8C%80%EC%8B%9C%EB%B3%B4%EB%93%9C/%EC%97%85%EB%AC%B4-%EB%8C%80%EC%8B%9C%EB%B3%B4%EB%93%9C.md">→ /think/chat/page/...업무 대시보드... <span class="url">📌 업무 대시보드</span></a>
+      <a href="/think/chat/page/wiki/%EC%8B%9C%EC%8A%A4%ED%85%9C/thinking-%EC%8B%9C%EC%8A%A4%ED%85%9C/thinking-%EC%8B%9C%EC%8A%A4%ED%85%9C.md">→ /think/chat/page/...thinking 시스템... <span class="url">📌 thinking</span></a>
+    </div>
+  </div>
+
+  <div class="stage shipped" id="s8">
+    <span class="ts">~ 10:30</span>
+    <h2><span class="num">8</span>"구현 추적도 필요" → 평면 막대 mockup</h2>
+    <div class="quote">지금 생각 부분에서도 앱이 점점 구현되고 있잖아! 어디까지 구현됐는지 이런 것도 필요할 것 같아.</div>
+    <div class="links">
+      <div class="lh">🟡 평면 막대 (fake 매핑)</div>
+      <a href="/build-tracker">→ /build-tracker <span class="url">페이지별 % + 결정 30개 상태 + 진행률 막대</span><span class="desc">생각 → 코드 매핑. 진행률 스캔에 강함</span></a>
+    </div>
+  </div>
+
+  <div class="stage shipped" id="s9">
+    <span class="ts">~ 11:00</span>
+    <h2><span class="num">9</span>"트리 구조로 보여줘" → 5종 텍스트 트리</h2>
+    <div class="quote">어디까지 뭐가 되었는지는 트리 구조? 같은 형태가 어떨까? Codex 와 심도있게 토론.</div>
+    <div class="links">
+      <div class="lh">🟡 5종 텍스트 트리 (들여쓰기 + 가지문자)</div>
+      <a href="/tree-trackers">→ /tree-trackers <span class="url">인덱스</span></a>
+      <a href="/tree-trackers/spine">→ Spine <span class="url">결정 중심</span></a>
+      <a href="/tree-trackers/ladder">→ Ladder <span class="url">단계 중심</span></a>
+      <a href="/tree-trackers/cap">→ CapTree <span class="url">도메인 중심</span></a>
+      <a href="/tree-trackers/chrono">→ Chrono <span class="url">시간 중심</span></a>
+      <a href="/tree-trackers/twin">→ Twin <span class="url">토글</span></a>
+    </div>
+  </div>
+
+  <div class="stage current" id="s10">
+    <span class="ts">방금</span>
+    <h2><span class="num">10</span>"더 시각화 해줘" → 5종 시각 트리</h2>
+    <div class="quote">트리가 그냥 너무 나열식이잖아! HTML/CSS 써서 이쁘게 표현해줘! 구상도 잘 해보고!</div>
+    <div class="links">
+      <div class="lh">🟡 5종 시각 트리 (CSS 박스 + d3)</div>
+      <a href="/tree-vis">→ /tree-vis <span class="url">인덱스 (5개 카드)</span></a>
+      <a href="/tree-vis/org">→ Org Chart <span class="url">수직 박스 + CSS 라인 (조직도 스타일)</span></a>
+      <a href="/tree-vis/htree">→ Horizontal Tree <span class="url">좌→우 d3.tree (가지 곡선)</span></a>
+      <a href="/tree-vis/sunburst">→ ⭐ Sunburst <span class="url">방사형, 다크 테마, hover 패널</span></a>
+      <a href="/tree-vis/mindmap">→ Mind Map <span class="url">d3 force, 자연 배치, 드래그/줌</span></a>
+      <a href="/tree-vis/treemap">→ Treemap <span class="url">면적 비율, 페이지 색가족</span></a>
+    </div>
+  </div>
+
+  <div class="stage" id="s11">
+    <span class="ts">다음</span>
+    <h2><span class="num">9</span>📌 지금 상태 + 다음 결정</h2>
+    <div class="note next"><b>📥 사용자 결정 대기:</b> ① 채팅 진입 OK? ② 구현 추적 mockup 어때? ③ 메인 교체 시점</div>
+    <div class="links">
+      <div class="lh">🟢 이미 동작 (운영 중)</div>
+      <a href="/think">→ /think <span class="url">메인 (옛 3-패널 + 새 챗봇 진입점)</span></a>
+      <a href="/">→ / <span class="url">업무 대시보드</span></a>
+    </div>
+    <div class="note next">
+      <b>제안 순서</b>:<br>
+      1. [생각] 메인을 Spotlight 베이스로 교체 + 구현 추적 위젯 통합<br>
+      2. 챗봇 SQLite 세션 저장 + "페이지에 반영" patch UI (Codex 2단계)<br>
+      3. 결정에 <code>구현: 완료/진행/계획</code> 메타 박는 규칙 합의 + 자동 추적
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

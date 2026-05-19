@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="ko"><head>
+{% include "combos/_base_head.html" %}
+<title>챗봇 위치 5개 후보</title>
+</head><body>
+<div class="cb-header">
+  <span><a href="/combos/9">← Spotlight 기본</a> · <a href="/combos">12개 조합</a></span>
+  <span class="name">챗봇 위치 후보 5개</span>
+  <span></span>
+</div>
+<div class="cb-wrap" style="text-align:center;">
+  <h1 style="font-size:1.6rem;color:var(--navy);margin:18px 0 4px;">💬 챗봇을 어디에 둘까?</h1>
+  <p style="color:var(--muted);margin:0 0 18px;font-size:0.92rem;">Spotlight 베이스 동일. 챗봇 자리만 5가지로 변형. 카드 클릭 → 실제 화면.</p>
+</div>
+<div class="combo-card-grid">
+  {% for s in spots %}
+    <a class="combo-tile" href="/chat-spots/{{ s.id }}">
+      <span class="code">변형 {{ s.id|upper }}</span>
+      <h3>{{ s.name }}</h3>
+      <p>{{ s.desc }}</p>
+    </a>
+  {% endfor %}
+</div>
+</body></html>

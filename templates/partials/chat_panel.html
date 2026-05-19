@@ -1,0 +1,79 @@
+{# 실 동작 챗봇 — POST /api/think-chat #}
+{% set mode = mode|default('panel') %}
+<div class="chat-{{ mode }}" id="chat-{{ mode }}-box">
+  <div class="chat-head">
+    <span class="chat-dot"></span>
+    <span class="chat-title">💭 생각 던지기</span>
+    <span class="chat-sub">raw 자동 저장 · Claude Opus</span>
+    {% if mode in ['modal','drawer'] %}<button class="chat-close" onclick="document.getElementById('chat-{{ mode }}-box').style.display='none'">✕</button>{% endif %}
+  </div>
+  <div class="chat-body" id="chat-body-{{ mode }}">
+    <div class="chat-msg ai"><div class="chat-bubble">막 던지셔도 됩니다. 길게 말씀하셔도 raw 에 그대로 남고, 제가 자연스럽게 대화 받아드릴게요.</div></div>
+  </div>
+  <div class="chat-input">
+    <textarea id="chat-input-{{ mode }}" placeholder="💭 막 던지세요 (⌘+Enter 전송)" rows="2"></textarea>
+    <button class="chat-send" onclick="thinkChatSend('{{ mode }}')">↑</button>
+  </div>
+</div>
+<script>
+if (!window.__thinkChatInit) {
+  window.__thinkChatInit = true;
+  window.__thinkChatHistory = [];
+  window.thinkChatSend = async function(mode) {
+    const ta = document.getElementById("chat-input-" + mode);
+    const body = document.getElementById("chat-body-" + mode);
+    const text = (ta.value || "").trim();
+    if (!text) return;
+    // 사용자 bubble
+    body.insertAdjacentHTML("beforeend",
+      `<div class="chat-msg user"><div class="chat-bubble">${escapeHtml(text)}</div></div>`);
+    ta.value = "";
+    // pending bot bubble
+    const pendId = "pend-" + Date.now();
+    body.insertAdjacentHTML("beforeend",
+      `<div class="chat-msg ai" id="${pendId}"><div class="chat-bubble" style="opacity:0.6;">…생각 중</div></div>`);
+    body.scrollTop = body.scrollHeight;
+    __thinkChatHistory.push({role: "user", content: text});
+    try {
+      const r = await fetch("/api/think-chat", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({messages: __thinkChatHistory})
+      });
+      const j = await r.json();
+      const pend = document.getElementById(pendId);
+      if (j.ok) {
+        const reply = j.reply || "(빈 응답)";
+        const rawNote = j.raw && j.raw.ok
+          ? `<div style="font-size:0.66rem;color:var(--muted);margin-top:6px;">📥 raw/${j.raw.path} · ${j.raw.timestamp}</div>` : "";
+        pend.innerHTML = `<div class="chat-bubble">${escapeHtml(reply).replace(/\n/g,"<br>")}${rawNote}</div>`;
+        __thinkChatHistory.push({role: "assistant", content: reply});
+      } else {
+        pend.innerHTML = `<div class="chat-bubble" style="background:#fee2e2;color:#991b1b;">⚠ ${escapeHtml(j.error || "오류")}</div>`;
+      }
+      // 모든 mode 동기화
+      syncHistoryToAllBoxes();
+    } catch (e) {
+      document.getElementById(pendId).innerHTML = `<div class="chat-bubble" style="background:#fee2e2;color:#991b1b;">⚠ 네트워크 오류</div>`;
+    }
+    body.scrollTop = body.scrollHeight;
+  };
+  function escapeHtml(s) {
+    return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  }
+  function syncHistoryToAllBoxes() {
+    // 같은 페이지에 chat panel 이 여러 개여도 history 공유 (mode 별 DOM 분리되어 있어도 OK)
+  }
+  // ⌘+Enter / Ctrl+Enter 전송
+  document.addEventListener("keydown", e => {
+    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+      const ta = document.activeElement;
+      if (ta && ta.tagName === "TEXTAREA" && ta.id.startsWith("chat-input-")) {
+        const mode = ta.id.replace("chat-input-", "");
+        thinkChatSend(mode);
+        e.preventDefault();
+      }
+    }
+  });
+}
+</script>

@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="ko"><head>
+{% include "combos/_base_head.html" %}
+{% import "tree_trackers/_macros.html" as m %}
+<title>ChronoTree · 시간 중심</title>
+<style>
+  .day-block { padding:10px 14px; border-radius:8px; margin:8px 0; background:#f8fafc; border-left:4px solid #6366f1; }
+  .day-head { font-weight:800; color:#3730a3; margin-bottom:6px; display:flex; align-items:center; gap:8px; }
+</style>
+</head><body>
+{% include "tree_trackers/_nav.html" %}
+<div class="tree-wrap">
+  <div class="tree-hero">
+    <h1>🕐 ChronoTree — 시간 중심</h1>
+    <p>날짜를 부모로, 그 날의 결정·구현 이벤트를 가지처럼. 데일리/주간 리뷰에 최적.</p>
+  </div>
+
+  <div class="tree-card">
+    <h2>📅 날짜별 결정·구현</h2>
+    {% for dt, decs in tree.by_date.items() %}
+      {% set ship = decs|selectattr('impl_status','eq','shipped')|list|length %}
+      {% set prog = decs|selectattr('impl_status','eq','in_progress')|list|length %}
+      {% set plan = decs|selectattr('impl_status','eq','planned')|list|length %}
+      <div class="day-block">
+        <div class="day-head">
+          📅 {{ dt }}
+          <span style="color:var(--muted);font-size:0.78rem;font-weight:400;">{{ decs|length }} 건</span>
+          <span style="margin-left:auto;display:flex;gap:4px;font-size:0.7rem;">
+            {% if ship %}<span class="badge s">✅ {{ ship }}</span>{% endif %}
+            {% if prog %}<span class="badge p">⏳ {{ prog }}</span>{% endif %}
+            {% if plan %}<span class="badge x">📋 {{ plan }}</span>{% endif %}
+          </span>
+        </div>
+        <div class="tn">
+          {% for d in decs %}
+            <div class="line">
+              <span class="twig">{{ "├─ " if not loop.last else "└─ " }}</span>
+              <span class="ic">{% if d.impl_status == 'shipped' %}✅{% elif d.impl_status == 'in_progress' %}⏳{% else %}📋{% endif %}</span>
+              <span class="badge x" style="font-size:0.62rem;">{{ d.page_title }}</span>
+              <span class="lbl">{{ d.decision[:70] }}{% if d.decision|length > 70 %}…{% endif %}</span>
+              {% if d.evidence and d.evidence.commits %}<span class="ev">{{ d.evidence.commits }}c</span>{% endif %}
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+</body></html>

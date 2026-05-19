@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>결정 라벨링</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}?v=15">
+<link rel="stylesheet" href="{{ url_for('static', filename='combos.css') }}?v=1">
+<style>
+  body { background:#f1f4f8; }
+  .ld-wrap { max-width:1100px; margin:30px auto; padding:0 24px 40px; }
+  .ld-hero { background:linear-gradient(135deg,#fef3c7,#fff); border:1px solid #fde68a; border-radius:14px; padding:18px 24px; margin-bottom:18px; }
+  .ld-hero h1 { margin:0; color:#92400e; font-size:1.3rem; }
+  .ld-hero p { margin:6px 0 0; color:#78350f; font-size:0.86rem; line-height:1.55; }
+
+  .ld-actions { display:flex; gap:10px; margin-bottom:20px; align-items:center; flex-wrap:wrap; }
+  .ld-btn { background:var(--think); color:#fff; border:none; border-radius:8px; padding:10px 18px; font-weight:700; cursor:pointer; font-size:0.9rem; }
+  .ld-btn:disabled { opacity:0.5; cursor:not-allowed; }
+  .ld-btn.apply { background:#16a34a; }
+  .ld-btn.outline { background:#fff; border:1px solid var(--border); color:var(--navy); }
+
+  .ld-status { background:#fff; border-radius:10px; padding:14px 18px; margin-bottom:14px; box-shadow:0 2px 8px rgba(0,0,0,0.04); }
+  .ld-status .lbl { font-size:0.84rem; color:var(--muted); margin-bottom:6px; }
+  .ld-status .summary { display:flex; gap:18px; font-size:0.92rem; }
+  .ld-status .summary b { font-size:1.2rem; }
+
+  .ld-list { background:#fff; border-radius:12px; box-shadow:0 4px 14px rgba(0,0,0,0.05); }
+  .ld-row { display:grid; grid-template-columns:140px 1fr 200px; gap:14px; padding:14px 18px; border-bottom:1px dashed var(--border); align-items:center; }
+  .ld-row:last-child { border:none; }
+  .ld-row .meta { font-size:0.74rem; color:var(--muted); }
+  .ld-row .pchip { font-size:0.7rem; padding:2px 8px; border-radius:5px; background:var(--chip); color:#3d4b58; font-weight:700; display:inline-block; }
+  .ld-row .dt { font-family:ui-monospace,Menlo,monospace; font-size:0.7rem; color:var(--muted); margin-left:4px; }
+  .ld-row .text { font-size:0.88rem; color:#243038; line-height:1.5; margin-top:4px; }
+  .ld-row .ev { font-size:0.74rem; color:#15803d; margin-top:4px; font-style:italic; }
+
+  .status-sel { display:flex; gap:4px; }
+  .status-sel button {
+    flex:1; padding:6px 8px; border-radius:6px; border:2px solid transparent;
+    cursor:pointer; font-weight:700; font-size:0.74rem;
+  }
+  .status-sel button.on.shipped { background:#dcfce7; color:#166534; border-color:#16a34a; }
+  .status-sel button.on.in_progress { background:#fef3c7; color:#92400e; border-color:#f59e0b; }
+  .status-sel button.on.planned { background:#f1f5f9; color:#64748b; border-color:#94a3b8; }
+  .status-sel button:not(.on) { background:#fafbfc; color:#94a3b8; }
+
+  .ld-empty { padding:40px; text-align:center; color:var(--muted); }
+  .spinner { display:inline-block; width:14px; height:14px; border:2px solid #cbd5e1; border-top-color:var(--think); border-radius:50%; animation:spin 0.8s linear infinite; vertical-align:-2px; margin-right:6px; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .note { background:#dbeafe; border-left:3px solid #3b82f6; padding:10px 14px; border-radius:0 6px 6px 0; font-size:0.82rem; color:#1e40af; margin:10px 0; }
+</style>
+</head>
+<body>
+<div class="cb-header">
+  <span><a href="/think">← 생각 메인</a> · <a href="/tree-vis/mindmap">Mind Map 보기</a> · <a href="/today">오늘 정리</a></span>
+  <span class="name">🏷 결정 라벨링</span>
+  <span></span>
+</div>
+
+<div class="ld-wrap">
+  <div class="ld-hero">
+    <h1>🏷 결정 30개에 구현 상태 박기</h1>
+    <p>Claude Opus 가 wj-dashboard 코드 트리와 결정 텍스트를 비교해서 구현 상태 자동 제안. 사용자가 보고 수정 후 "전부 적용" → thinking md 파일에 <code>| 구현: 완료</code> 1칸 추가.</p>
+  </div>
+
+  <div class="ld-actions">
+    <button class="ld-btn" id="classify-btn" onclick="classify()">🤖 Claude 자동 분류 시작</button>
+    <span style="font-size:0.78rem;color:var(--muted);">⏱ 약 1~2분 소요. Claude Opus 호출.</span>
+    <button class="ld-btn apply" id="apply-btn" onclick="applyAll()" disabled style="margin-left:auto;">✓ 전부 md 에 적용</button>
+  </div>
+
+  <div class="ld-status" id="status">
+    <div class="lbl">상태</div>
+    <div>아직 분류 시작 안 함. 위 버튼 누르세요.</div>
+  </div>
+
+  <div class="note">
+    💡 적용 후 [<a href="/tree-vis/mindmap">Mind Map</a>] 페이지를 새로고침하면 진짜 구현 상태가 반영됩니다 (지금은 fake 매핑).
+  </div>
+
+  <div class="ld-list" id="list">
+    <div class="ld-empty">결정 분류 결과가 여기 표시됩니다.</div>
+  </div>
+</div>
+
+<script>
+let currentDecisions = [];
+
+async function classify() {
+  const btn = document.getElementById("classify-btn");
+  const status = document.getElementById("status");
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Claude 분류 중 (~1분)...';
+  status.innerHTML = '<div class="lbl">상태</div><div><span class="spinner"></span> Claude Opus 호출 중. 30개 결정 + 코드 파일 분석.</div>';
+
+  try {
+    const r = await fetch("/api/classify-decisions", {method: "POST"});
+    const j = await r.json();
+    if (j.ok) {
+      currentDecisions = j.decisions;
+      renderList();
+      const s = currentDecisions.filter(d => d.suggested_status === "shipped").length;
+      const p = currentDecisions.filter(d => d.suggested_status === "in_progress").length;
+      const x = currentDecisions.filter(d => d.suggested_status === "planned").length;
+      status.innerHTML = `<div class="lbl">Claude 분류 완료</div>
+        <div class="summary">
+          <span>✅ shipped <b style="color:#16a34a;">${s}</b></span>
+          <span>⏳ in_progress <b style="color:#f59e0b;">${p}</b></span>
+          <span>📋 planned <b style="color:#64748b;">${x}</b></span>
+          <span style="margin-left:auto;color:var(--muted);font-size:0.84rem;">필요시 각 줄 라디오 클릭해서 수정 → 전부 적용</span>
+        </div>`;
+      document.getElementById("apply-btn").disabled = false;
+    } else {
+      status.innerHTML = `<div class="lbl">⚠ 오류</div><div style="color:#b91c1c;">${j.error || '알 수 없음'}</div>`;
+      if (j.raw) status.innerHTML += `<pre style="font-size:0.7rem;background:#fee2e2;padding:8px;border-radius:6px;overflow-x:auto;">${escapeHtml(j.raw)}</pre>`;
+    }
+  } catch (e) {
+    status.innerHTML = `<div class="lbl">⚠ 네트워크 오류</div><div>${e.message}</div>`;
+  }
+  btn.disabled = false;
+  btn.innerHTML = '🔄 다시 분류';
+}
+
+function renderList() {
+  const list = document.getElementById("list");
+  if (!currentDecisions.length) {
+    list.innerHTML = '<div class="ld-empty">결과 없음</div>';
+    return;
+  }
+  list.innerHTML = currentDecisions.map((d, i) => `
+    <div class="ld-row">
+      <div>
+        <span class="pchip">${escapeHtml(d.page_title)}</span>
+        <span class="dt">${d.date || '—'}</span>
+        <div class="text">${escapeHtml(d.decision.slice(0, 120))}${d.decision.length > 120 ? '…' : ''}</div>
+        ${d.suggested_evidence ? `<div class="ev">💡 ${escapeHtml(d.suggested_evidence)}</div>` : ''}
+      </div>
+      <div></div>
+      <div class="status-sel" data-idx="${i}">
+        <button class="${d.suggested_status === 'shipped' ? 'on shipped' : ''}" data-st="shipped">✅ 완료</button>
+        <button class="${d.suggested_status === 'in_progress' ? 'on in_progress' : ''}" data-st="in_progress">⏳ 진행</button>
+        <button class="${d.suggested_status === 'planned' ? 'on planned' : ''}" data-st="planned">📋 계획</button>
+      </div>
+    </div>
+  `).join("");
+  // hookup status change
+  list.querySelectorAll(".status-sel").forEach(sel => {
+    sel.addEventListener("click", e => {
+      const btn = e.target.closest("button");
+      if (!btn) return;
+      const idx = parseInt(sel.dataset.idx);
+      const st = btn.dataset.st;
+      currentDecisions[idx].suggested_status = st;
+      // 시각 갱신
+      sel.querySelectorAll("button").forEach(b => {
+        b.className = b.dataset.st === st ? `on ${st}` : '';
+      });
+    });
+  });
+}
+
+async function applyAll() {
+  if (!confirm(`결정 ${currentDecisions.length} 개에 라벨 박습니다. thinking md 파일이 수정됩니다. 계속?`)) return;
+  const btn = document.getElementById("apply-btn");
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> 적용 중...';
+  const labels = currentDecisions.map(d => ({
+    page_path: d.page_path,
+    decision_raw: d.raw,
+    status: d.suggested_status,
+  }));
+  try {
+    const r = await fetch("/api/apply-impl-labels", {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({labels}),
+    });
+    const j = await r.json();
+    alert(`✓ 적용 완료: ${j.applied}/${j.total}\n\n실패한 ${j.total - j.applied} 개는 결정 텍스트 미스매치 가능.\n\nMind Map 새로고침하면 반영됨.`);
+  } catch (e) {
+    alert("⚠ 오류: " + e.message);
+  }
+  btn.disabled = false;
+  btn.innerHTML = '✓ 전부 md 에 적용';
+}
+
+function escapeHtml(s) {
+  return (s || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+</script>
+</body>
+</html>

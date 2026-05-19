@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mockup 1 · Link Constellation</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}?v=15">
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<style>
+  body{background:#0e1626;color:#e2e8f0;}
+  .mk-header{max-width:1280px;margin:14px auto;padding:0 24px;display:flex;justify-content:space-between;align-items:center;color:#cbd5e1;font-size:0.86rem;}
+  .mk-header a{color:#93c5fd;text-decoration:none;margin:0 8px;}
+  .mk-title b{color:#fff;}
+  .mk-wrap{max-width:1280px;margin:0 auto;padding:0 24px 30px;display:grid;grid-template-columns:1fr 320px;gap:18px;}
+  .mk-graph{background:#1e293b;border-radius:14px;padding:16px;min-height:600px;position:relative;}
+  .mk-side{background:#1e293b;border-radius:14px;padding:18px;}
+  .mk-side h3{margin:0 0 10px;font-size:0.95rem;color:#f1f5f9;border-bottom:1px solid #334155;padding-bottom:6px;}
+  .mk-toolbar{display:flex;gap:8px;margin-bottom:10px;font-size:0.78rem;color:#94a3b8;}
+  .mk-toolbar input{background:#0f172a;border:1px solid #334155;color:#e2e8f0;border-radius:6px;padding:4px 10px;font-size:0.8rem;width:160px;}
+  svg{width:100%;height:600px;display:block;}
+  .node circle{cursor:pointer;}
+  .node text{font-size:11px;fill:#f1f5f9;pointer-events:none;font-weight:600;}
+  .link{stroke:#475569;stroke-opacity:0.55;}
+  .legend{position:absolute;bottom:14px;right:14px;background:rgba(15,23,42,0.85);border-radius:8px;padding:8px 12px;font-size:0.7rem;color:#cbd5e1;line-height:1.5;}
+  .legend .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:middle;}
+  .side-meta{font-size:0.82rem;line-height:1.6;color:#cbd5e1;}
+  .side-meta .k{color:#94a3b8;margin-right:4px;}
+  .side-meta a{color:#93c5fd;text-decoration:none;}
+  .side-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;}
+  .side-stats div{background:#0f172a;padding:8px;border-radius:6px;text-align:center;}
+  .side-stats b{font-size:1.2rem;color:#fff;display:block;}
+  .side-stats span{font-size:0.66rem;color:#94a3b8;}
+  .empty-hint{color:#64748b;font-size:0.78rem;line-height:1.5;font-style:italic;}
+</style>
+</head>
+<body>
+<div class="mk-header">
+  <span class="mk-back"><a href="/mockups">← 6개 다 보기</a></span>
+  <span class="mk-title">Mockup 1 / 6 · <b>Link Constellation</b></span>
+  <span class="mk-nav">
+    <a href="/mockups/6">‹ 6</a><a href="/mockups/2">2 ›</a>
+  </span>
+</div>
+
+<div class="mk-wrap">
+  <div class="mk-graph">
+    <div class="mk-toolbar">
+      <input placeholder="🔍 검색 (페이지/태그)">
+      <span style="margin-left:auto;">노드 크기 = 활동량 (결정+타임라인)</span>
+    </div>
+    <svg id="graph"></svg>
+    <div class="legend">
+      <div><span class="dot" style="background:#22c55e"></span>시스템 카테고리</div>
+      <div>● 크기 ∝ 활동량 &nbsp; ━ wikilink 연결</div>
+    </div>
+  </div>
+
+  <aside class="mk-side">
+    <h3 id="sel-title">노드를 클릭하세요</h3>
+    <div id="sel-body" class="empty-hint">
+      그래프에서 페이지 노드를 클릭하면 여기에 상세가 나타납니다. 드래그로 이동, 휠로 줌 가능.
+    </div>
+  </aside>
+</div>
+
+<script>
+const data = {{ data|tojson }};
+const nodes = data.nodes.map(n => ({...n}));
+const edges = data.edges.map(e => ({...e}));
+
+const svg = d3.select("#graph");
+const w = svg.node().getBoundingClientRect().width;
+const h = 600;
+
+const g = svg.append("g");
+svg.call(d3.zoom().on("zoom", e => g.attr("transform", e.transform)));
+
+const sim = d3.forceSimulation(nodes)
+  .force("link", d3.forceLink(edges).id(d=>d.id).distance(140))
+  .force("charge", d3.forceManyBody().strength(-400))
+  .force("center", d3.forceCenter(w/2, h/2))
+  .force("collide", d3.forceCollide().radius(d => 30 + d.weight * 2));
+
+const link = g.append("g").selectAll("line").data(edges).join("line")
+  .attr("class","link").attr("stroke-width", 1.5);
+
+const node = g.append("g").selectAll("g").data(nodes).join("g")
+  .attr("class","node")
+  .call(d3.drag()
+    .on("start", (e,d)=>{ if(!e.active) sim.alphaTarget(0.3).restart(); d.fx=d.x; d.fy=d.y; })
+    .on("drag", (e,d)=>{ d.fx=e.x; d.fy=e.y; })
+    .on("end", (e,d)=>{ if(!e.active) sim.alphaTarget(0); d.fx=null; d.fy=null; }))
+  .on("click", (e,d)=>select(d));
+
+const color = d3.scaleOrdinal(d3.schemeTableau10);
+node.append("circle")
+  .attr("r", d => 18 + d.weight * 1.2)
+  .attr("fill", d => color(d.category))
+  .attr("stroke","#0e1626").attr("stroke-width",2);
+node.append("text").text(d=>d.title).attr("text-anchor","middle").attr("dy",4);
+
+sim.on("tick", () => {
+  link.attr("x1",d=>d.source.x).attr("y1",d=>d.source.y).attr("x2",d=>d.target.x).attr("y2",d=>d.target.y);
+  node.attr("transform", d=>`translate(${d.x},${d.y})`);
+});
+
+function select(d){
+  document.getElementById("sel-title").textContent = d.title;
+  const back = (data.edges.filter(e=>e.source.id===d.id||e.target.id===d.id||e.source===d.id||e.target===d.id).length);
+  document.getElementById("sel-body").className = "side-meta";
+  document.getElementById("sel-body").innerHTML = `
+    <div><span class="k">카테고리</span>${d.category}</div>
+    <div><span class="k">type</span>${d.type}</div>
+    <div><span class="k">상태</span>${d.status}</div>
+    <div><span class="k">갱신</span>${d.updated}</div>
+    <div class="side-stats">
+      <div><b>${d.decisions}</b><span>결정</span></div>
+      <div><b>${d.timeline}</b><span>타임라인</span></div>
+      <div><b>${back}</b><span>연결</span></div>
+      <div><b>${d.weight}</b><span>활동량</span></div>
+    </div>
+    <div style="margin-top:12px;"><a href="/think/page/${encodeURIComponent(d.path)}">→ 페이지 열기</a></div>
+  `;
+}
+// 초기 자동 선택
+if (nodes.length) select(nodes[0]);
+</script>
+</body>
+</html>

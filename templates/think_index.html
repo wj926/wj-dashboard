@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>wj · 생각</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}?v=15">
+<link rel="stylesheet" href="{{ url_for('static', filename='thinking.css') }}?v=30">
+</head>
+<body>
+<div class="wrap think-wrap">
+
+  <div class="topbar">
+    <span class="brand">wj<span class="dot">.</span></span>
+    {% include "_tabs.html" %}
+    <span class="topright">
+      <a href="/think/chat" style="background:var(--think);color:#fff;padding:7px 16px;border-radius:8px;text-decoration:none;font-weight:700;font-size:0.86rem;margin-right:10px;">💬 새 대화</a>
+      <span id="sync-state" class="sync-state">생각 {{ stats.total_pages }} · 결정 {{ stats.active_decisions }}</span>
+    </span>
+  </div>
+
+  <div class="think-grid">
+
+    <!-- 좌: 페이지 목록 (카테고리별) -->
+    <aside class="think-sidebar">
+      <h3>📚 페이지 <span class="cnt">{{ stats.total_pages }}</span></h3>
+
+      <div class="t-stats">
+        <div><b>{{ stats.long_term_count }}</b><span>장기 플랜</span></div>
+        <div><b>{{ stats.active_decisions }}</b><span>유효 결정</span></div>
+        <div><b>{{ all_timeline|length }}</b><span>타임라인</span></div>
+      </div>
+
+      {% for category, pages_in_cat in by_category.items() %}
+        <h4 class="cat-header">{{ category }} <span>{{ pages_in_cat|length }}</span></h4>
+        {% for p in pages_in_cat %}
+          <div style="display:flex;align-items:center;gap:4px;">
+            <a class="t-page-link" href="/think/page/{{ p.path|urlencode }}" style="flex:1;">
+              <span class="t-page-title">{{ p.title }}</span>
+              <span class="t-page-meta">
+                {% if p.type == 'long-term-plan' %}<span class="t-type ltp">장기</span>{% elif p.type == 'idea' %}<span class="t-type idea">아이디어</span>{% else %}<span class="t-type tg">생각</span>{% endif %}
+                {% if p.status == 'paused' %}· paused{% elif p.status == 'archived' %}· archived{% endif %}
+              </span>
+            </a>
+            <a href="/think/chat/page/{{ p.path|urlencode }}" title="이 페이지와 대화"
+               style="padding:6px 9px;border-radius:6px;text-decoration:none;font-size:1rem;color:var(--think);"
+               onmouseover="this.style.background='#ede9fe'" onmouseout="this.style.background=''">💬</a>
+          </div>
+        {% endfor %}
+      {% endfor %}
+    </aside>
+
+    <!-- 중앙: 최근 결정 트래커 -->
+    <section class="think-main">
+      <h2>🧭 최근 결정</h2>
+      <div class="dec-list">
+        {% for d in all_decisions[:20] %}
+          <div class="dec-row {% if d.is_dropped %}dropped{% endif %}">
+            <div class="dec-meta">
+              <span class="dec-date">{{ d.date or '—' }}</span>
+              {% if d.is_dropped %}<span class="dec-status dropped">폐기</span>{% else %}<span class="dec-status">유효</span>{% endif %}
+            </div>
+            <div class="dec-body">
+              <div class="dec-text">{{ d.decision }}</div>
+              {% if d.reason %}<div class="dec-reason">근거 · {{ d.reason }}</div>{% endif %}
+              <a class="dec-page-link" href="/think/page/{{ d.page_path|urlencode }}">{{ d.page_title }}</a>
+            </div>
+          </div>
+        {% else %}
+          <p style="color:var(--muted);">결정 없음</p>
+        {% endfor %}
+      </div>
+    </section>
+
+    <!-- 우: 타임라인 + 최근 갱신 -->
+    <aside class="think-rail">
+      <h3>🕐 타임라인</h3>
+      <div class="tl-list">
+        {% for e in all_timeline[:15] %}
+          <div class="tl-row">
+            <span class="tl-date">{{ e.date or '—' }}</span>
+            <div class="tl-body">
+              <div class="tl-text">{{ e.text }}</div>
+              <a class="tl-page-link" href="/think/page/{{ e.page_path|urlencode }}">→ {{ e.page_title }}</a>
+            </div>
+          </div>
+        {% else %}
+          <p style="color:var(--muted);">타임라인 없음</p>
+        {% endfor %}
+      </div>
+
+      <h3 style="margin-top:18px;">🆕 최근 갱신</h3>
+      <div class="recent-pages">
+        {% for p in recent[:6] %}
+          <a class="t-page-link sm" href="/think/page/{{ p.path|urlencode }}">
+            <span class="t-page-title">{{ p.title }}</span>
+            <span class="t-page-meta">{{ p.updated[:10] }}</span>
+          </a>
+        {% endfor %}
+      </div>
+    </aside>
+
+  </div>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="ko"><head>
+{% include "combos/_base_head.html" %}
+<title>Mind Map · 자연 배치</title>
+<style>
+  body { background:radial-gradient(ellipse at center, #1e293b 0%, #0e1626 70%); color:#e2e8f0; min-height:100vh; }
+  .mm-wrap { padding:20px; }
+  #mm { width:100%; height:calc(100vh - 100px); display:block; cursor:grab; }
+  #mm:active { cursor:grabbing; }
+  .mm-leg { display:flex; gap:18px; justify-content:center; margin-bottom:10px; font-size:0.82rem; color:#cbd5e1; }
+  .mm-leg .lg { display:inline-flex; align-items:center; gap:6px; }
+  .mm-leg .sw { width:12px; height:12px; border-radius:50%; }
+  .tooltip-mm {
+    position:absolute; background:rgba(15,23,42,0.95); color:#fff; padding:10px 14px;
+    border-radius:8px; font-size:0.8rem; pointer-events:none; display:none; max-width:320px;
+    line-height:1.5; box-shadow:0 8px 24px rgba(0,0,0,0.4); z-index:50;
+  }
+</style>
+</head><body>
+{% include "tree_vis/_nav.html" %}
+
+<div class="mm-leg">
+  <span class="lg"><span class="sw" style="background:#22c55e;"></span>✅ shipped</span>
+  <span class="lg"><span class="sw" style="background:#f59e0b;"></span>⏳ in_progress</span>
+  <span class="lg"><span class="sw" style="background:#94a3b8;"></span>📋 planned</span>
+  <span style="margin-left:20px;font-size:0.74rem;color:#64748b;">🖱 드래그/줌 · hover = 상세</span>
+</div>
+
+<div class="mm-wrap">
+  <svg id="mm"></svg>
+</div>
+<div class="tooltip-mm" id="tt-mm"></div>
+
+<script>
+const data = {{ h|tojson }};
+
+// flatten to nodes/links
+const nodes = [];
+const links = [];
+nodes.push({id:"root", name:data.name, type:"root", size:38});
+data.children.forEach((p, pi) => {
+  const pid = "p-" + pi;
+  nodes.push({id:pid, name:p.name, type:"page", color:p.color, size:24,
+              shipped:p.shipped, in_progress:p.in_progress, planned:p.planned,
+              total:p.total, pct:p.pct});
+  links.push({source:"root", target:pid, kind:"root-page"});
+  p.children.forEach((d, di) => {
+    const did = pid + "-d" + di;
+    nodes.push({id:did, name:d.name, type:"decision", impl:d.impl, date:d.date,
+                full_text:d.full_text, parent_name:p.name, size:8});
+    links.push({source:pid, target:did, kind:"page-dec", impl:d.impl});
+  });
+});
+
+const svg = d3.select("#mm");
+const rect = svg.node().getBoundingClientRect();
+const W = rect.width, H = rect.height;
+svg.attr("viewBox", `0 0 ${W} ${H}`);
+
+const g = svg.append("g");
+svg.call(d3.zoom().scaleExtent([0.3, 3]).on("zoom", e => g.attr("transform", e.transform)));
+
+const sim = d3.forceSimulation(nodes)
+  .force("link", d3.forceLink(links).id(d=>d.id).distance(l => l.kind === "root-page" ? 180 : 80).strength(0.7))
+  .force("charge", d3.forceManyBody().strength(d => d.type === "root" ? -1200 : d.type === "page" ? -600 : -120))
+  .force("center", d3.forceCenter(W/2, H/2))
+  .force("collide", d3.forceCollide().radius(d => d.size + 6));
+
+const link = g.append("g").selectAll("line").data(links).join("line")
+  .attr("stroke", d => {
+    if (d.kind === "root-page") return "#475569";
+    if (d.impl === "shipped") return "#22c55e";
+    if (d.impl === "in_progress") return "#f59e0b";
+    return "#475569";
+  })
+  .attr("stroke-opacity", 0.55)
+  .attr("stroke-width", d => d.kind === "root-page" ? 2.5 : 1.2);
+
+const node = g.append("g").selectAll("g").data(nodes).join("g")
+  .call(d3.drag()
+    .on("start",(e,d)=>{if(!e.active)sim.alphaTarget(0.3).restart();d.fx=d.x;d.fy=d.y;})
+    .on("drag",(e,d)=>{d.fx=e.x;d.fy=e.y;})
+    .on("end",(e,d)=>{if(!e.active)sim.alphaTarget(0);d.fx=null;d.fy=null;}))
+  .on("mousemove",(e,d)=>{
+    const tt = document.getElementById("tt-mm");
+    let html = `<b>${d.name}</b>`;
+    if (d.type === "page") html += `<br>📂 결정 ${d.total} · 완료 ${d.shipped}/${d.total} (${d.pct}%)`;
+    if (d.type === "decision") {
+      const icn = d.impl === "shipped" ? "✅" : d.impl === "in_progress" ? "⏳" : "📋";
+      html += `<br>${icn} ${d.impl} · 📅 ${d.date || '-'}<br>📂 ${d.parent_name}`;
+      if (d.full_text) html += `<br><i style="color:#94a3b8;">${d.full_text.slice(0,150)}</i>`;
+    }
+    tt.innerHTML = html;
+    tt.style.display = "block";
+    tt.style.left = (e.pageX + 14) + "px";
+    tt.style.top = (e.pageY - 10) + "px";
+  })
+  .on("mouseleave",() => document.getElementById("tt-mm").style.display = "none");
+
+node.append("circle")
+  .attr("r", d => d.size)
+  .attr("fill", d => {
+    if (d.type === "root") return "url(#root-glow)";
+    if (d.type === "page") return d.color;
+    if (d.impl === "shipped") return "#22c55e";
+    if (d.impl === "in_progress") return "#f59e0b";
+    return "#94a3b8";
+  })
+  .attr("stroke", "#0e1626")
+  .attr("stroke-width", 2);
+
+// glow gradient for root
+const defs = svg.append("defs");
+const glow = defs.append("radialGradient").attr("id","root-glow");
+glow.append("stop").attr("offset","0%").attr("stop-color","#a855f7");
+glow.append("stop").attr("offset","100%").attr("stop-color","#3730a3");
+
+node.filter(d => d.type !== "decision").append("text")
+  .text(d => d.type === "root" ? "🧠 " + d.name : d.name)
+  .attr("text-anchor","middle")
+  .attr("dy", d => d.type === "root" ? 5 : 4)
+  .attr("fill","#fff")
+  .attr("font-weight", d => d.type === "root" ? 800 : 700)
+  .attr("font-size", d => d.type === "root" ? "13px" : "11px")
+  .style("pointer-events","none")
+  .style("text-shadow","0 1px 3px rgba(0,0,0,0.8)");
+
+sim.on("tick", () => {
+  link.attr("x1",d=>d.source.x).attr("y1",d=>d.source.y).attr("x2",d=>d.target.x).attr("y2",d=>d.target.y);
+  node.attr("transform", d=>`translate(${d.x},${d.y})`);
+});
+</script>
+</body></html>

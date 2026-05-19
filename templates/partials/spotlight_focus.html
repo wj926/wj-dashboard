@@ -1,0 +1,37 @@
+<style>
+  .fc-big { background:#fff;border-radius:14px;padding:18px 20px;box-shadow:0 6px 20px rgba(0,0,0,0.06);
+            display:grid;grid-template-columns:50px 1fr 110px;gap:16px;align-items:center;
+            border-left:5px solid var(--rk);margin-bottom:12px;}
+  .fc-big.r1{--rk:#dc2626;} .fc-big.r2{--rk:#ea580c;} .fc-big.r3{--rk:#d97706;} .fc-big.r4{--rk:#65a30d;} .fc-big.r5{--rk:#0891b2;}
+  .fc-big .rank{font-size:2rem;font-weight:800;color:var(--rk);text-align:center;line-height:1;}
+  .fc-big .ttl{font-size:1.15rem;color:var(--navy);font-weight:800;margin-bottom:5px;}
+  .fc-big .ttl a{color:var(--navy);text-decoration:none;}
+  .fc-big .meta{display:flex;gap:10px;font-size:0.76rem;color:var(--muted);margin-bottom:7px;flex-wrap:wrap;}
+  .fc-big .meta b{color:#243038;}
+  .fc-big .recent{background:#f8fafc;border-radius:8px;padding:7px 11px;font-size:0.78rem;color:#243038;line-height:1.45;border-left:3px solid var(--rk);}
+  .fc-big .scbx{text-align:center;}
+  .fc-big .scbx .n{font-size:1.7rem;font-weight:800;color:var(--rk);line-height:1;}
+  .fc-big .scbx .lb{font-size:0.62rem;color:var(--muted);text-transform:uppercase;margin-top:2px;}
+  .fc-big .scbx .br{height:5px;background:#e2e8f0;border-radius:3px;margin-top:6px;overflow:hidden;}
+  .fc-big .scbx .br > div{height:100%;background:var(--rk);}
+</style>
+{% set top5 = data.focus[:5] %}{% set max_sc = top5[0].score if top5 else 1 %}
+{% for f in top5 %}
+  <div class="fc-big r{{ loop.index }}">
+    <div class="rank">#{{ loop.index }}</div>
+    <div>
+      <div class="ttl"><a href="/think/page/{{ f.path|urlencode }}">{{ f.title }}</a></div>
+      <div class="meta">
+        <span>📅 <b>{{ f.updated }}</b></span>
+        <span>🧭 결정 <b>{{ f.decisions }}</b></span>
+        <span>📌 미완 <b>{{ f.todos_open }}</b></span>
+      </div>
+      {% if f.last_decision %}<div class="recent"><b>{{ f.last_decision.date or '-' }}</b> · {{ f.last_decision.decision }}</div>{% endif %}
+    </div>
+    <div class="scbx">
+      <div class="n">{{ f.score|round(0)|int }}</div>
+      <div class="lb">집중도</div>
+      <div class="br"><div style="width:{{ (f.score/max_sc*100)|round }}%"></div></div>
+    </div>
+  </div>
+{% endfor %}

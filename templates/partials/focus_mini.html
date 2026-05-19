@@ -1,0 +1,14 @@
+<div class="fc-mini">
+{% set limit = limit|default(5) %}
+{% set max_sc = data.focus[0].score if data.focus else 1 %}
+{% for f in data.focus[:limit] %}
+  <div class="row r{{ loop.index }}">
+    <div class="rk">#{{ loop.index }}</div>
+    <div>
+      <div class="tt"><a href="/think/page/{{ f.path|urlencode }}">{{ f.title }}</a></div>
+      <div class="meta">결정 {{ f.decisions }} · 미완 todo {{ f.todos_open }}</div>
+    </div>
+    <div class="sc">{{ f.score|round(0)|int }}</div>
+  </div>
+{% endfor %}
+</div>

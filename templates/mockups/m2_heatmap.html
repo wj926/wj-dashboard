@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mockup 2 · Thinking Heat Calendar</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}?v=15">
+<style>
+  body{background:#f8fafc;}
+  .mk-header{max-width:1280px;margin:14px auto;padding:0 24px;display:flex;justify-content:space-between;align-items:center;color:#475569;font-size:0.86rem;}
+  .mk-header a{color:var(--think);text-decoration:none;margin:0 8px;}
+  .mk-title b{color:var(--navy);}
+  .mk-wrap{max-width:1280px;margin:0 auto;padding:0 24px 30px;display:grid;grid-template-columns:1fr 320px;gap:18px;}
+  .heat-card{background:#fff;border-radius:14px;padding:22px;box-shadow:0 4px 14px rgba(0,0,0,0.05);}
+  .heat-card h2{margin:0 0 4px;font-size:1.05rem;color:var(--navy);}
+  .heat-card .sub{color:var(--muted);font-size:0.78rem;margin-bottom:14px;}
+  .heat-svg{width:100%;height:auto;display:block;}
+  .heat-cell{stroke:#fff;stroke-width:1.5;cursor:pointer;}
+  .heat-cell:hover{stroke:#1e293b;stroke-width:2;}
+  .heat-legend{display:flex;justify-content:flex-end;align-items:center;gap:6px;font-size:0.72rem;color:var(--muted);margin-top:10px;}
+  .heat-legend .sq{width:13px;height:13px;border-radius:2px;}
+  .side h3{margin:0 0 10px;font-size:0.95rem;color:var(--navy);border-bottom:1px solid var(--border);padding-bottom:6px;}
+  .side-card{background:#fff;border-radius:14px;padding:18px;box-shadow:0 4px 14px rgba(0,0,0,0.05);margin-bottom:14px;}
+  .topic-row{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px dashed var(--border);}
+  .topic-row:last-child{border:none;}
+  .topic-bar{flex:1;height:8px;background:#e2e8f0;border-radius:4px;overflow:hidden;}
+  .topic-bar > div{height:100%;background:linear-gradient(90deg,var(--think),#6d4cb6);border-radius:4px;}
+  .topic-row .name{font-size:0.86rem;color:#243038;flex:0 0 110px;font-weight:600;}
+  .topic-row .val{font-size:0.78rem;color:var(--muted);min-width:32px;text-align:right;}
+  .tt{position:absolute;background:#1e293b;color:#fff;padding:6px 10px;border-radius:6px;font-size:0.74rem;pointer-events:none;display:none;z-index:10;white-space:nowrap;}
+  .month-labels text{font-size:10px;fill:#94a3b8;}
+  .weekday-labels text{font-size:9px;fill:#94a3b8;}
+  .summary{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
+  .summary div{background:#f1f5f9;border-radius:8px;padding:10px;text-align:center;}
+  .summary b{display:block;font-size:1.3rem;color:var(--navy);}
+  .summary span{font-size:0.66rem;color:var(--muted);text-transform:uppercase;}
+</style>
+</head>
+<body>
+<div class="mk-header">
+  <span><a href="/mockups">← 6개 다 보기</a></span>
+  <span class="mk-title">Mockup 2 / 6 · <b>Thinking Heat Calendar</b></span>
+  <span><a href="/mockups/1">‹ 1</a><a href="/mockups/3">3 ›</a></span>
+</div>
+
+<div class="mk-wrap">
+  <div>
+    <div class="heat-card">
+      <h2>🔥 최근 6개월 활동 히트맵</h2>
+      <div class="sub">점수 = 결정 추가 × 3 + 타임라인 × 2. 셀 hover → 그 날 활동.</div>
+      <svg id="heat" class="heat-svg"></svg>
+      <div class="heat-legend">
+        적음 <span class="sq" style="background:#ebedf0"></span><span class="sq" style="background:#c7d2fe"></span><span class="sq" style="background:#818cf8"></span><span class="sq" style="background:#6366f1"></span><span class="sq" style="background:#4338ca"></span> 많음
+      </div>
+    </div>
+
+    <div class="heat-card" style="margin-top:18px;">
+      <h2>📊 통계 요약</h2>
+      <div class="summary">
+        <div><b>{{ data.heat_cells|selectattr('score','gt',0)|list|length }}</b><span>활동 일</span></div>
+        <div><b>{{ data.heat_cells|sum(attribute='score') }}</b><span>총 점수</span></div>
+        <div><b>{{ (data.heat_cells|sum(attribute='score') / 180)|round(1) }}</b><span>일평균</span></div>
+      </div>
+    </div>
+  </div>
+
+  <aside class="side">
+    <div class="side-card">
+      <h3>🔥 최근 7일 핫토픽</h3>
+      {% if data.top_7d %}
+        {% set mx = data.top_7d[0][1] %}
+        {% for t, s in data.top_7d %}
+          <div class="topic-row">
+            <span class="name">{{ t }}</span>
+            <div class="topic-bar"><div style="width:{{ (s/mx*100)|round }}%"></div></div>
+            <span class="val">{{ s }}</span>
+          </div>
+        {% endfor %}
+      {% else %}
+        <p style="color:var(--muted);font-size:0.86rem;">최근 7일 활동 없음</p>
+      {% endif %}
+    </div>
+
+    <div class="side-card">
+      <h3>📈 최근 30일 토픽</h3>
+      {% if data.top_30d %}
+        {% set mx2 = data.top_30d[0][1] %}
+        {% for t, s in data.top_30d %}
+          <div class="topic-row">
+            <span class="name">{{ t }}</span>
+            <div class="topic-bar"><div style="width:{{ (s/mx2*100)|round }}%"></div></div>
+            <span class="val">{{ s }}</span>
+          </div>
+        {% endfor %}
+      {% endif %}
+    </div>
+  </aside>
+</div>
+
+<div class="tt" id="tt"></div>
+
+<script>
+const cells = {{ data.heat_cells|tojson }};
+// 주 단위로 그룹 (월요일 기준)
+const svg = document.getElementById("heat");
+const cellSize = 14, gap = 2, wkLabelW = 32, mLabelH = 18;
+const weeks = Math.ceil(cells.length / 7) + 2;
+const W = wkLabelW + weeks * (cellSize + gap);
+const H = mLabelH + 7 * (cellSize + gap);
+svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+const NS = "http://www.w3.org/2000/svg";
+
+function color(s){
+  if (s === 0) return "#ebedf0";
+  if (s <= 3) return "#c7d2fe";
+  if (s <= 8) return "#818cf8";
+  if (s <= 20) return "#6366f1";
+  return "#4338ca";
+}
+
+// 시작일의 요일 → 그 주 첫 자리 결정
+const first = new Date(cells[0].date);
+const firstWeekday = (first.getDay() + 6) % 7;  // 월=0
+
+let monthLabels = {};
+cells.forEach((c, i) => {
+  const wkIdx = Math.floor((i + firstWeekday) / 7);
+  const dayIdx = (i + firstWeekday) % 7;
+  const x = wkLabelW + wkIdx * (cellSize + gap);
+  const y = mLabelH + dayIdx * (cellSize + gap);
+  const rect = document.createElementNS(NS, "rect");
+  rect.setAttribute("x", x);
+  rect.setAttribute("y", y);
+  rect.setAttribute("width", cellSize);
+  rect.setAttribute("height", cellSize);
+  rect.setAttribute("rx", 2);
+  rect.setAttribute("fill", color(c.score));
+  rect.setAttribute("class", "heat-cell");
+  rect.dataset.date = c.date;
+  rect.dataset.score = c.score;
+  svg.appendChild(rect);
+  // month label
+  const dt = new Date(c.date);
+  if (dt.getDate() <= 7 && !monthLabels[dt.getMonth()]) {
+    monthLabels[dt.getMonth()] = x;
+    const t = document.createElementNS(NS, "text");
+    t.setAttribute("x", x);
+    t.setAttribute("y", 12);
+    t.setAttribute("class","month-labels");
+    t.textContent = (dt.getMonth()+1) + "월";
+    svg.appendChild(t);
+  }
+});
+
+// 요일 라벨
+["월","수","금"].forEach((d, i) => {
+  const t = document.createElementNS(NS, "text");
+  t.setAttribute("x", 4);
+  t.setAttribute("y", mLabelH + (i*2)*(cellSize+gap) + 10);
+  t.setAttribute("class","weekday-labels");
+  t.textContent = d;
+  svg.appendChild(t);
+});
+
+const tt = document.getElementById("tt");
+svg.addEventListener("mousemove", e => {
+  if (e.target.classList.contains("heat-cell")){
+    tt.style.display = "block";
+    tt.style.left = (e.pageX + 12) + "px";
+    tt.style.top = (e.pageY - 10) + "px";
+    tt.textContent = `${e.target.dataset.date} · ${e.target.dataset.score}점`;
+  } else { tt.style.display = "none"; }
+});
+svg.addEventListener("mouseleave", () => tt.style.display = "none");
+</script>
+</body>
+</html>

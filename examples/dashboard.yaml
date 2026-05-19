@@ -1,0 +1,144 @@
+schema: dashboard.v1
+projects:
+- id: prj_payment_refactor
+  title: 결제 시스템 리팩토링
+  status: active
+  due_at: '2026-07-04'
+  tags: [업무, 백엔드]
+  folder_path: null
+  source_thinking: thinking/wiki/일/결제-리팩토링.md
+  created_at: '2026-05-06T09:00:00+09:00'
+  updated_at: '2026-05-19T11:00:00+09:00'
+- id: prj_rss_reader
+  title: 개인 RSS reader (Rust 연습)
+  status: active
+  due_at: '2026-08-31'
+  tags: [사이드, Rust]
+  folder_path: null
+  source_thinking: thinking/wiki/사이드/rss-reader.md
+  created_at: '2026-05-09T20:00:00+09:00'
+  updated_at: '2026-05-17T22:00:00+09:00'
+- id: prj_homelab
+  title: 홈랩 셋업 (Proxmox)
+  status: active
+  due_at: null
+  tags: [사이드, 인프라]
+  folder_path: null
+  source_thinking: thinking/wiki/사이드/홈랩-셋업.md
+  created_at: '2026-05-07T22:00:00+09:00'
+  updated_at: '2026-05-18T23:00:00+09:00'
+
+tasks:
+- id: tsk_001
+  project_id: prj_payment_refactor
+  parent_task_id: null
+  title: legacy 결제 모듈 의존성 그래프 그리기
+  status: done
+  due_at: '2026-05-10'
+  done_at: '2026-05-09'
+  note: pydeps. 순환 의존성 3곳 발견.
+  created_at: '2026-05-06T09:00:00+09:00'
+  updated_at: '2026-05-09T18:00:00+09:00'
+- id: tsk_002
+  project_id: prj_payment_refactor
+  parent_task_id: null
+  title: 신규 결제 모듈 인터페이스 설계
+  status: done
+  due_at: '2026-05-15'
+  done_at: '2026-05-14'
+  note: PaymentGateway 추상 + 구현 3개. 팀 리뷰 OK.
+  created_at: '2026-05-09T18:30:00+09:00'
+  updated_at: '2026-05-14T18:00:00+09:00'
+- id: tsk_003
+  project_id: prj_payment_refactor
+  parent_task_id: null
+  title: 카드 결제 path 신규 모듈 카나리 1%
+  status: doing
+  due_at: '2026-05-29'
+  done_at: null
+  note: feature flag payment_v2_card.
+  created_at: '2026-05-14T18:00:00+09:00'
+  updated_at: '2026-05-19T11:00:00+09:00'
+- id: tsk_004
+  project_id: prj_payment_refactor
+  parent_task_id: null
+  title: legacy 모듈 제거
+  status: todo
+  due_at: '2026-07-04'
+  done_at: null
+  note: 신규 100% + 1주 관찰 후.
+  created_at: '2026-05-14T18:05:00+09:00'
+  updated_at: '2026-05-14T18:05:00+09:00'
+
+- id: tsk_010
+  project_id: prj_rss_reader
+  parent_task_id: null
+  title: Rust 으로 RSS 파서 toy
+  status: done
+  due_at: '2026-05-13'
+  done_at: '2026-05-12'
+  note: feed-rs 크레이트. 100줄.
+  created_at: '2026-05-09T20:00:00+09:00'
+  updated_at: '2026-05-12T23:30:00+09:00'
+- id: tsk_011
+  project_id: prj_rss_reader
+  parent_task_id: null
+  title: SQLite 로 read/unread 저장
+  status: doing
+  due_at: '2026-05-26'
+  done_at: null
+  note: rusqlite. 마이그레이션은 단순하게.
+  created_at: '2026-05-13T22:00:00+09:00'
+  updated_at: '2026-05-17T22:00:00+09:00'
+- id: tsk_012
+  project_id: prj_rss_reader
+  parent_task_id: null
+  title: TUI (ratatui) 리스트 뷰
+  status: todo
+  due_at: '2026-06-30'
+  done_at: null
+  note: j/k/Enter 키바인딩.
+  created_at: '2026-05-13T22:00:00+09:00'
+  updated_at: '2026-05-13T22:00:00+09:00'
+
+- id: tsk_020
+  project_id: prj_homelab
+  parent_task_id: null
+  title: Proxmox 설치 + Ubuntu VM
+  status: done
+  due_at: '2026-05-11'
+  done_at: '2026-05-10'
+  note: 중고 미니PC. 네트워크 브릿지 헷갈렸음.
+  created_at: '2026-05-07T22:00:00+09:00'
+  updated_at: '2026-05-10T23:00:00+09:00'
+- id: tsk_021
+  project_id: prj_homelab
+  parent_task_id: null
+  title: Caddy + Tailscale HTTPS
+  status: doing
+  due_at: '2026-05-25'
+  done_at: null
+  note: "*.home.local 식."
+  created_at: '2026-05-12T21:00:00+09:00'
+  updated_at: '2026-05-18T23:00:00+09:00'
+
+- id: tsk_050
+  project_id: null
+  parent_task_id: null
+  title: 부모님 종합검진 동행 (6/4)
+  status: todo
+  due_at: '2026-06-04'
+  done_at: null
+  note: 휴가 1일.
+  created_at: '2026-05-12T20:00:00+09:00'
+  updated_at: '2026-05-12T20:00:00+09:00'
+- id: tsk_051
+  project_id: null
+  parent_task_id: null
+  title: 주 3회 러닝
+  status: doing
+  due_at: '2026-05-24'
+  done_at: null
+  note: 화/목/토 5km.
+  created_at: '2026-05-13T13:00:00+09:00'
+  updated_at: '2026-05-19T07:10:00+09:00'

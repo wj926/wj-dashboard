@@ -1,0 +1,9 @@
+<div class="cb-header">
+  <span><a href="/chat-spots">← 5개 위치 다 보기</a> · <a href="/combos/9">기본 Spotlight</a></span>
+  <span class="name">챗봇 위치 <b>{{ spot.id|upper }}</b> — {{ spot.name }}</span>
+  <span>
+    {% for s in spots %}
+      <a href="/chat-spots/{{ s.id }}" {% if s.id == spot.id %}style="color:var(--navy);font-weight:800;"{% endif %}>{{ s.id|upper }}</a>
+    {% endfor %}
+  </span>
+</div>

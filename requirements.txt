@@ -1,0 +1,5 @@
+Flask>=3.0
+flask-sock>=0.7
+PyYAML>=6.0
+Markdown>=3.5
+ptyprocess>=0.7

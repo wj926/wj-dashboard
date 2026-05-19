@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ page.title }} 편집 · wj 생각</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}?v=15">
+<link rel="stylesheet" href="{{ url_for('static', filename='thinking.css') }}?v=30">
+<style>
+.edit-wrap { max-width: 1100px; margin: 14px auto; padding: 0 24px; }
+.edit-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 12px; }
+.edit-head h1 { margin: 0; color: var(--navy); font-size: 1.15rem; }
+.edit-head .path { color: var(--muted); font-size: 0.74rem; font-family: ui-monospace, monospace; }
+.edit-head .spacer { flex: 1; }
+.edit-actions a, .edit-actions button {
+  font: inherit; cursor: pointer; padding: 8px 16px; border-radius: 8px;
+  font-weight: 700; font-size: 0.84rem; text-decoration: none;
+  border: 1px solid var(--border); background: #fff; color: var(--navy);
+  margin-left: 6px;
+}
+.edit-actions .save { background: var(--navy); color: #fff; border-color: var(--navy); }
+.edit-actions .save:hover { background: #162a44; }
+.edit-actions .save:disabled { opacity: 0.5; cursor: wait; }
+.edit-textarea {
+  width: 100%; min-height: 70vh; resize: vertical;
+  background: #fff; border: 1px solid var(--border); border-radius: 8px;
+  padding: 14px 16px; font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.86rem; line-height: 1.55; color: #243038;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+.edit-hint { margin-top: 8px; font-size: 0.74rem; color: var(--muted); }
+.edit-hint code { background: #f1f5f9; padding: 1px 5px; border-radius: 3px; }
+.edit-saved { color: #16a34a; font-size: 0.84rem; font-weight: 700; }
+.edit-error { color: #b91c1c; font-size: 0.84rem; font-weight: 700; }
+</style>
+</head>
+<body>
+<div class="wrap think-wrap">
+  <div class="topbar">
+    <span class="brand">wj<span class="dot">.</span></span>
+    {% include "_tabs.html" %}
+    <span class="topright"><a href="/think/page/{{ rel_path|urlencode }}" style="background:var(--think);color:#fff;padding:6px 12px;border-radius:8px;text-decoration:none;font-weight:700;font-size:0.78rem;">← 페이지로</a></span>
+  </div>
+
+  <div class="edit-wrap">
+    <div class="edit-head">
+      <h1>📝 {{ page.title }} 편집</h1>
+      <span class="path">{{ rel_path }}</span>
+      <span class="spacer"></span>
+      <span id="status"></span>
+      <div class="edit-actions">
+        <a href="/think/page/{{ rel_path|urlencode }}">취소</a>
+        <button id="save-btn" class="save">💾 저장</button>
+      </div>
+    </div>
+
+    <textarea id="md-content" class="edit-textarea" spellcheck="false">{{ body }}</textarea>
+
+    <div class="edit-hint">
+      💡 저장 시 frontmatter (YAML) 가 검증됩니다. 저장 전 백업이 <code>{{ rel_path }}.bak</code> 으로 1회 보존됩니다.
+      Ctrl+S (Mac: Cmd+S) 단축키.
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const ta = document.getElementById('md-content');
+  const btn = document.getElementById('save-btn');
+  const status = document.getElementById('status');
+  const relPath = {{ rel_path|tojson }};
+
+  async function save() {
+    btn.disabled = true;
+    status.textContent = '저장 중...';
+    status.className = '';
+    try {
+      const r = await fetch('/api/think/page/save', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({rel_path: relPath, content: ta.value}),
+      });
+      const j = await r.json();
+      if (!r.ok || !j.ok) throw new Error(j.error || r.statusText);
+      status.textContent = '✓ 저장됨 (백업 ' + j.backup + ')';
+      status.className = 'edit-saved';
+    } catch (e) {
+      status.textContent = '✗ ' + e.message;
+      status.className = 'edit-error';
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  btn.addEventListener('click', save);
+  document.addEventListener('keydown', e => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+      e.preventDefault();
+      save();
+    }
+  });
+})();
+</script>
+</body>
+</html>

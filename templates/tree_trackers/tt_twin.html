@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="ko"><head>
+{% include "combos/_base_head.html" %}
+{% import "tree_trackers/_macros.html" as m %}
+<title>TwinTree · 토글</title>
+<style>
+  .phase-block { background:#f8fafc; border-radius:8px; padding:10px 14px; margin:8px 0; border-left:4px solid var(--p-color); }
+  .phase-block.MVP { --p-color:#16a34a; } .phase-block.V2 { --p-color:#f59e0b; } .phase-block.V3 { --p-color:#94a3b8; }
+  .phase-head { display:flex; align-items:center; gap:8px; font-weight:800; margin-bottom:6px; color:var(--p-color); font-size:0.9rem; }
+  .view-pane { display:none; }
+  .view-pane.on { display:block; animation:fade 0.2s; }
+  @keyframes fade { from {opacity:0;} to {opacity:1;} }
+  .filter-bar { display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap; font-size:0.8rem; }
+  .filter-bar span { padding:5px 12px; border-radius:6px; cursor:pointer; background:#f1f5f9; color:#475569; font-weight:700; }
+  .filter-bar span.on { background:var(--think); color:#fff; }
+</style>
+</head><body>
+{% include "tree_trackers/_nav.html" %}
+<div class="tree-wrap">
+  <div class="tree-hero">
+    <h1>🌳 TwinTree — Codex 최종 추천</h1>
+    <p>같은 데이터를 <b>결정 중심</b> ↔ <b>단계 중심</b> 토글. "왜 만들었지?"와 "어디까지 왔지?"를 한 화면에서.</p>
+  </div>
+
+  <div class="tree-toggle" id="vt">
+    <a href="#" data-view="va" class="on">📚 결정 중심 (Spine)</a>
+    <a href="#" data-view="vb">🪜 단계 중심 (Ladder)</a>
+  </div>
+
+  <div class="filter-bar" id="fb">
+    <span class="on" data-filter="all">전체</span>
+    <span data-filter="shipped">✅ 완료만</span>
+    <span data-filter="in_progress">⏳ 진행만</span>
+    <span data-filter="planned">📋 계획만</span>
+    <span style="margin-left:auto;background:transparent;cursor:default;color:var(--muted);">(필터 mockup)</span>
+  </div>
+
+  <!-- View A: Spine -->
+  <div class="view-pane on" id="va">
+    {% for title, decs in tree.by_page.items() %}
+      {% set ship = decs|selectattr('impl_status','eq','shipped')|list|length %}
+      {% set prog = decs|selectattr('impl_status','eq','in_progress')|list|length %}
+      {% set plan = decs|selectattr('impl_status','eq','planned')|list|length %}
+      <div class="tree-card">
+        <h2>📂 {{ title }}
+          <span style="display:flex;align-items:center;gap:8px;font-size:0.78rem;font-weight:400;color:var(--muted);">
+            결정 {{ decs|length }}
+            {{ m.mini_bar(ship, prog, plan) }}
+          </span>
+        </h2>
+        <div class="tn">
+          {% for d in decs %}
+            {{ m.decision_with_evidence(d, "├─ " if not loop.last else "└─ ") }}
+          {% endfor %}
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+
+  <!-- View B: Ladder -->
+  <div class="view-pane" id="vb">
+    {% for title, phase_data in tree.page_phase_pct.items() %}
+      {% set page_decs = tree.by_page[title] %}
+      {% set ship_total = page_decs|selectattr('impl_status','eq','shipped')|list|length %}
+      <div class="tree-card">
+        <h2>📂 {{ title }}<span class="pct" style="font-size:1rem;">{{ (100*ship_total/page_decs|length)|round }}%</span></h2>
+        {% for phase in ['MVP', 'V2', 'V3'] %}
+          {% set stat = phase_data[phase] %}
+          {% if stat %}
+            <div class="phase-block {{ phase }}">
+              <div class="phase-head">
+                {% if phase == 'MVP' %}🟢{% elif phase == 'V2' %}🟡{% else %}⚪{% endif %}
+                {{ phase }} <span style="font-weight:400;color:var(--muted);font-size:0.78rem;">— {{ stat.shipped }}/{{ stat.total }} · {{ stat.pct }}%</span>
+              </div>
+              <div class="tn">
+                {% for d in page_decs %}
+                  {% if d.phase == phase %}{{ m.decision_row(d, "  ") }}{% endif %}
+                {% endfor %}
+              </div>
+            </div>
+          {% endif %}
+        {% endfor %}
+      </div>
+    {% endfor %}
+  </div>
+</div>
+<script>
+document.querySelectorAll("#vt a").forEach(a => a.addEventListener("click", e => {
+  e.preventDefault();
+  document.querySelectorAll("#vt a").forEach(x => x.classList.remove("on"));
+  a.classList.add("on");
+  document.querySelectorAll(".view-pane").forEach(p => p.classList.remove("on"));
+  document.getElementById(a.dataset.view).classList.add("on");
+}));
+document.querySelectorAll("#fb span[data-filter]").forEach(s => s.addEventListener("click", () => {
+  document.querySelectorAll("#fb span[data-filter]").forEach(x => x.classList.remove("on"));
+  s.classList.add("on");
+  // mockup — 실제 필터 V2
+}));
+</script>
+</body></html>

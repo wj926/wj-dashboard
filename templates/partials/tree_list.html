@@ -1,0 +1,17 @@
+<div class="tr">
+{% for cat in data.tree %}
+  <div class="cat">📂 {{ cat.category }} · {{ cat.pages|length }}</div>
+  {% for p in cat.pages|sort(attribute='activity_recent', reverse=True) %}
+    {% set light = 'green' if p.days_idle <= 3 else ('yellow' if p.days_idle <= 14 else 'gray') %}
+    <div class="item">
+      <span class="lt {{ light }}" title="{{ p.days_idle }}일 전"></span>
+      <div>
+        <div class="nm"><a href="/think/page/{{ p.path|urlencode }}">{{ p.title }}</a></div>
+        <div class="mt">결정 {{ p.decisions }} · todo {{ p.todos_done }}/{{ p.todos_total }} · {{ p.activity_recent }}점</div>
+      </div>
+      <div class="pp-bar"><div style="width:{{ (100*p.todos_done/p.todos_total)|round if p.todos_total else 0 }}%"></div></div>
+      <span class="mt">{{ p.updated[5:] }}</span>
+    </div>
+  {% endfor %}
+{% endfor %}
+</div>

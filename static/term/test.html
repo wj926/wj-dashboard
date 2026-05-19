@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html><head>
+<meta charset="UTF-8">
+<title>wj-term scrollbar test</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css">
+<script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.min.js"></script>
+<link rel="stylesheet" href="/static/term/term.css?v=4">
+<style>
+  body { margin:0; background:#222; color:#fff; font-family:monospace; }
+  #area { position:relative; width:400px; height:600px; background:#1e1e1e; }
+  #xterm { width:100%; height:100%; padding:6px; box-sizing:border-box; }
+  #report { padding:10px; font-size:12px; white-space:pre; }
+</style>
+</head><body>
+<div id="area">
+  <div id="xterm"></div>
+  <div id="wj-term-scrollbar" class="wj-term-scrollbar">
+    <div id="wj-term-scrollbar-thumb" class="wj-term-scrollbar-thumb"></div>
+  </div>
+</div>
+<div id="report">loading...</div>
+<script type="module">
+const t = new window.Terminal({ scrollback: 1000, scrollOnUserInput: false });
+const fit = new window.FitAddon.FitAddon();
+t.loadAddon(fit);
+const host = document.getElementById("xterm");
+t.open(host);
+fit.fit();
+// 충분한 출력으로 스크롤백 채움
+for (let i=0; i<200; i++) t.write(`line ${i}\r\n`);
+
+const mockWjTerm = {
+  xterm: t,
+  getViewport: () => host.querySelector(".xterm-viewport"),
+  getXtermRoot: () => host.querySelector(".xterm"),
+};
+
+const { setupScrollbar } = await import("/static/term/term-scrollbar.js?v=3");
+setupScrollbar({
+  wjTerm: mockWjTerm,
+  barEl: document.getElementById("wj-term-scrollbar"),
+  thumbEl: document.getElementById("wj-term-scrollbar-thumb"),
+});
+
+setTimeout(() => {
+  const bar = document.getElementById("wj-term-scrollbar");
+  const thumb = document.getElementById("wj-term-scrollbar-thumb");
+  const vp = mockWjTerm.getViewport();
+  const cs = getComputedStyle(bar);
+  const cst = getComputedStyle(thumb);
+  const r = document.getElementById("report");
+  r.textContent = JSON.stringify({
+    bar: { className: bar.className, display: cs.display, w: bar.clientWidth, h: bar.clientHeight, bg: cs.background },
+    thumb: { display: cst.display, h: thumb.clientHeight, top: thumb.style.top, bg: cst.background },
+    viewport: vp ? { sH: vp.scrollHeight, cH: vp.clientHeight, sT: vp.scrollTop } : null,
+  }, null, 2);
+  console.log("DIAG_REPORT", r.textContent);
+}, 500);
+</script>
+</body></html>

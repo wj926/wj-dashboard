@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="ko"><head>
+{% include "combos/_base_head.html" %}
+{% import "tree_trackers/_macros.html" as m %}
+<title>CapTree · 도메인 중심</title>
+</head><body>
+{% include "tree_trackers/_nav.html" %}
+<div class="tree-wrap">
+  <div class="tree-hero">
+    <h1>🗺 Capability Map — 도메인 중심</h1>
+    <p>기능 도메인(UI / 검색 / 챗봇 / 데이터 / thinking) 별로 결정 묶음. "어느 기능군이 병목?" 답.</p>
+  </div>
+
+  {% set dom_cls = {'UI/레이아웃':'dom-ui','검색/Spotlight':'dom-search','챗봇/AI':'dom-chat','데이터/추적':'dom-data','thinking 스키마':'dom-thinking','기타':'dom-etc'} %}
+  {% for dom, decs in tree.by_domain.items() %}
+    {% set ship = decs|selectattr('impl_status','eq','shipped')|list|length %}
+    {% set prog = decs|selectattr('impl_status','eq','in_progress')|list|length %}
+    {% set plan = decs|selectattr('impl_status','eq','planned')|list|length %}
+    <div class="tree-card {{ dom_cls.get(dom, 'dom-etc') }}">
+      <h2>{{ dom }}
+        <span style="display:flex;align-items:center;gap:8px;font-size:0.78rem;font-weight:400;color:var(--muted);">
+          결정 {{ decs|length }}
+          {{ m.mini_bar(ship, prog, plan) }}
+        </span>
+      </h2>
+      <div class="tn">
+        {# 페이지 별로 sub-group #}
+        {% set pages_in_dom = decs|groupby('page_title') %}
+        {% for page_title, page_decs in pages_in_dom %}
+          {% set pdecs = page_decs|list %}
+          <details {% if loop.first %}open{% endif %}>
+            <summary>
+              <div class="line">
+                <span class="arr"></span>
+                <span class="ic">📂</span>
+                <span class="lbl">{{ page_title }} <span style="color:var(--muted);font-size:0.78rem;">({{ pdecs|length }})</span></span>
+              </div>
+            </summary>
+            {% for d in pdecs %}
+              {{ m.decision_row(d, "    ├─ " if not loop.last else "    └─ ") }}
+            {% endfor %}
+          </details>
+        {% endfor %}
+      </div>
+    </div>
+  {% endfor %}
+</div>
+</body></html>

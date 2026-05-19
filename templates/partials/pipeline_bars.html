@@ -1,0 +1,32 @@
+<div class="pp">
+{% if show_funnel|default(true) %}
+  {% set raw_count = data.tree[0].pages|sum(attribute='timeline') if data.tree else 0 %}
+  {% set ref_count = data.pipeline|sum(attribute='refine') // 25 %}
+  {% set todo_count = data.pipeline|sum(attribute='todo_open') %}
+  <div class="funnel">
+    <div class="st s1"><b>{{ raw_count }}</b>capture</div>
+    <span class="arr">→</span>
+    <div class="st s2"><b>{{ ref_count }}</b>정제</div>
+    <span class="arr">→</span>
+    <div class="st s3"><b>{{ data.stats.total_decisions }}</b>결정</div>
+    <span class="arr">→</span>
+    <div class="st s4"><b>{{ todo_count }}</b>todo</div>
+    <span class="arr">→</span>
+    <div class="st s5"><b>0</b>승격</div>
+  </div>
+{% endif %}
+{% for p in data.pipeline|sort(attribute='decision', reverse=True) %}
+  <a class="card-link" href="/think/page/{{ p.path|urlencode }}" title="{{ p.title }} 페이지 보기">
+    <div class="row linkable">
+      <span class="nm">{{ p.title }}</span>
+      <div class="stages">
+        <div class="seg" title="capture · raw 캡처 분량"><div class="fill f1" style="width:{{ p.capture }}%"></div></div>
+        <div class="seg" title="정제 · 지금 생각 + 결정 본문 길이"><div class="fill f2" style="width:{{ p.refine }}%"></div></div>
+        <div class="seg" title="결정 · 결정 개수"><div class="fill f3" style="width:{{ p.decision }}%"></div></div>
+        <div class="seg" title="todo · 완료율"><div class="fill f4" style="width:{{ p.todo_pct }}%"></div></div>
+        <div class="seg" title="승격 · 미구현"><div class="fill f5" style="width:{{ p.promoted }}%"></div></div>
+      </div>
+    </div>
+  </a>
+{% endfor %}
+</div>
