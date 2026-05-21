@@ -260,7 +260,7 @@
     const dueLabel = t.due_at ? `${fmtDate(t.due_at)} · ${ddayLabel(t.d_minus)}` : "마감 미정";
     return `
       <div class="sd-item ${isDone ? "is-done" : ""}" data-task-id="${escapeHtml(t.id)}" data-row="view">
-        <input type="checkbox" class="task-check sd-check" data-task-id="${escapeHtml(t.id)}" ${isDone ? "checked" : ""} />
+        <input type="checkbox" class="task-check sd-check" data-task-id="${escapeHtml(t.id)}" aria-label="완료 처리: ${escapeHtml(t.title)}" ${isDone ? "checked" : ""} />
         <div class="body">
           <div class="title">${escapeHtml(t.title)}</div>
           <div class="meta">

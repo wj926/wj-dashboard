@@ -128,17 +128,22 @@ body{margin:0;font-family:-apple-system,"Apple SD Gothic Neo","Noto Sans KR",san
   .cal-tile .cal-head{flex-direction:column;align-items:flex-start;gap:6px;}
   .cal-tile .cal-head .legend{display:none;}
 
-  /* 캘린더 nav 버튼 크게 */
-  .cal-nav-btn{width:34px;height:34px;line-height:32px;font-size:0.9rem;}
+  /* 캘린더 nav 버튼 크게 (44px 터치 기준) */
+  .cal-nav-btn{width:44px;height:44px;line-height:42px;font-size:0.95rem;}
 
   /* 모달 더 화면 가득 */
   .panel{max-height:92vh;}
   .chat-panel{max-height:92vh;}
 
-  /* Inbox 항목 터치 타겟 키움 */
-  .item{padding:10px 4px;}
-  .task-check{width:22px;height:22px;}
-  .task-check:checked::after{font-size:1rem;top:-2px;left:3px;}
+  /* Inbox 항목 터치 타겟 키움 (44px 기준) */
+  .item{padding:10px 4px;min-height:44px;}
+  .task-item{align-items:center;}
+  .task-check{width:24px;height:24px;flex:0 0 24px;}
+  .task-check:checked::after{font-size:1.05rem;top:-2px;left:4px;}
+  /* day-sheet 체크박스도 동일 */
+  .sd-check{width:24px;height:24px;flex:0 0 24px;}
+  /* 상단 탭/필터 터치 높이 */
+  .filters .f{min-height:40px;display:flex;align-items:center;}
 }
 
 /* ===== 오늘 마감 ===== */

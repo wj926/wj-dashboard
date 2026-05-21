@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>wj dashboard</title>
 <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
-<link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}?v=16">
+<link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}?v=17">
 </head>
 <body>
 <div class="wrap">
@@ -82,7 +82,7 @@
       {% endif %}
       {% for t in inbox_tasks %}
         <div class="item task-item{% if t.urgency == 'overdue' %} overdue-row{% endif %}{% if t.status == 'done' %} is-done{% endif %}" draggable="true" data-task-id="{{ t.id }}" data-task-status="{{ t.status }}">
-          <input type="checkbox" class="task-check" data-task-id="{{ t.id }}" {% if t.status == 'done' %}checked{% endif %} />
+          <input type="checkbox" class="task-check" data-task-id="{{ t.id }}" aria-label="완료 처리: {{ t.title }}" {% if t.status == 'done' %}checked{% endif %} />
           <span class="dday {{ t.urgency }}">
             {% if t.d_minus is none %}—{% elif t.d_minus == 0 %}D-0{% elif t.d_minus > 0 %}D-{{ t.d_minus }}{% else %}D+{{ -t.d_minus }}{% endif %}
           </span>
@@ -98,7 +98,7 @@
     <div class="tile today-tile has-urgent" data-open-day="{{ today_iso }}" style="cursor:pointer;" title="클릭 → 오늘 task 목록·수정">
       <h3>🔥 오늘 마감 <span class="cnt">D-0</span></h3>
       <div style="display:flex;align-items:flex-start;gap:8px;margin-top:5px;">
-        <input type="checkbox" class="task-check" data-task-id="{{ urgent_today.id }}" />
+        <input type="checkbox" class="task-check" data-task-id="{{ urgent_today.id }}" aria-label="완료 처리: {{ urgent_today.title }}" />
         <div style="flex:1;">
           <div class="title">{{ urgent_today.title }}</div>
           {% if urgent_today.note %}<div class="note">{{ urgent_today.note }}</div>{% endif %}
@@ -273,6 +273,6 @@
   window.__INBOX__ = {{ inbox_json_str|safe }};
   window.__TODAY_ISO__ = "{{ today_iso }}";
 </script>
-<script src="{{ url_for('static', filename='dashboard.js') }}?v=14"></script>
+<script src="{{ url_for('static', filename='dashboard.js') }}?v=15"></script>
 </body>
 </html>
