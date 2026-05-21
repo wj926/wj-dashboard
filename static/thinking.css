@@ -551,8 +551,24 @@ body:has(.think-wrap) { background: #f8fafc; }
   .ts-right { display: none; }
 }
 @media (max-width: 760px) {
-  .cb-wrap.ts-grid { grid-template-columns: 1fr; }
+  .cb-wrap.ts-grid { grid-template-columns: 1fr; padding-left: 14px; padding-right: 14px; }
   .ts-tree { position: static !important; max-height: none !important; }
+  /* grid blowout 방지: 자식이 내부 min-content 로 트랙을 밀지 않게.
+     think_spotlight.html 인라인 <style> 의 .fc-big 규칙(문서순서상 뒤)을 이기려고
+     .ts-center 접두사로 specificity 를 올린다 (미디어쿼리는 우선순위를 안 올림) */
+  .cb-wrap.ts-grid > .ts-tree,
+  .cb-wrap.ts-grid > .ts-center,
+  .ts-center .card-wrap,
+  .ts-center .fc-big { min-width: 0; }
+  /* TOP5 카드 모바일 재배치: 순위 | 본문, 점수는 아래 줄 가로 막대 */
+  .ts-center .fc-big { grid-template-columns: 40px 1fr; gap: 10px; padding: 14px; align-items: start; }
+  .ts-center .fc-big > div:nth-child(2) { min-width: 0; }
+  .ts-center .fc-big .rank { font-size: 1.5rem; padding-top: 2px; }
+  .ts-center .fc-big .scbx { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; text-align: left; }
+  .ts-center .fc-big .scbx .n { font-size: 1.2rem; }
+  .ts-center .fc-big .scbx .lb { margin-top: 0; }
+  .ts-center .fc-big .scbx .br { flex: 1; margin-top: 0; }
+  .ts-center .fc-big .recent { word-break: break-word; }
 }
 
 /* 좌측 트리 */

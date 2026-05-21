@@ -9,7 +9,7 @@
 <!-- BUILD: 2026-05-18T18:20 v=6 -->
 <script>
   // 캐시 강제 우회 빌드 토큰. 첫 진입 1회에 URL 고정 파라미터를 주입해 모바일 Chrome 강캐시 우회.
-  window.__WJ_CHAT_BUILD_ID__ = "20260518T1930";
+  window.__WJ_CHAT_BUILD_ID__ = "20260519T1855";
   (function forceBuildQueryOnce() {
     try {
       const u = new URL(location.href);
@@ -25,11 +25,12 @@
   window.addEventListener("pageshow", (e) => { if (e.persisted) location.reload(); });
 </script>
 <title>{% if mode == 'context' %}{{ page.title }} · 대화{% else %}전역 대화{% endif %} · wj 생각</title>
+<link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css">
 <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.min.js"></script>
-<link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}?v=15&b=20260518T1930">
-<link rel="stylesheet" href="{{ url_for('static', filename='term/term.css') }}?v=8&b=20260518T1930">
+<link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}?v=15&b=20260519T1855">
+<link rel="stylesheet" href="{{ url_for('static', filename='term/term.css') }}?v=8&b=20260519T1855">
 <style>
   body { background:#f1f4f8; margin:0; height:100vh; height:100dvh; overflow:hidden; display:flex; flex-direction:column; padding-bottom:env(safe-area-inset-bottom); box-sizing:border-box; }
   .chat-top {
@@ -1063,7 +1064,7 @@ function openWorkMode() {
     }, 300);
     {% endif %}
 
-    const buildId = window.__WJ_CHAT_BUILD_ID__ || "20260518T1930";
+    const buildId = window.__WJ_CHAT_BUILD_ID__ || "20260519T1855";
     const by = encodeURIComponent(buildId);
     const importFresh = (base, v) =>
       import(`${base}?v=${v}&b=${by}`)
