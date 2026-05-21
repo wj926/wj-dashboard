@@ -78,10 +78,14 @@ def _guard_chat():
 
 
 def _same_origin_host() -> bool:
-    """state-changing 요청의 Origin/Referer 호스트가 우리 호스트와 같은지.
-    정상 브라우저는 same-origin POST 에 Origin 을 보내고, 외부 공격 페이지는
-    자기 Origin 을 달고 오므로 호스트 불일치로 걸러진다 (CSRF 방어)."""
+    """state-changing 요청이 same-origin 인지 (CSRF 방어).
+    1차: Sec-Fetch-Site (모든 모던 브라우저가 보냄, iPad Safari 16.4+ 포함) —
+         same-origin/same-site/none 허용, cross-site/cross-origin 차단.
+    폴백: 헤더 없는 구형 클라이언트는 Origin/Referer netloc == request.host 비교."""
     from urllib.parse import urlparse
+    sfs = request.headers.get("Sec-Fetch-Site")
+    if sfs:
+        return sfs in ("same-origin", "same-site", "none")
     src = request.headers.get("Origin") or request.headers.get("Referer")
     if not src:
         return False
