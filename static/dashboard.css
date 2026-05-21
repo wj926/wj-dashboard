@@ -299,6 +299,13 @@ body{margin:0;font-family:-apple-system,"Apple SD Gothic Neo","Noto Sans KR",san
 .bubble.bot .task-preview .pv-line{font-size:0.86rem;padding:3px 0;display:flex;gap:10px;align-items:center;color:#243038;}
 .bubble.bot .task-preview .pv-line .icn{color:var(--dash);}
 .chat-actions .primary .icn,.chat-actions .ghost .icn{margin-right:4px;}
+/* 챗 빈 상태 안내 */
+.chat-empty{margin:auto 0;text-align:center;padding:18px 8px;}
+.chat-empty .ce-title{font-size:1rem;font-weight:800;color:var(--navy);margin-bottom:6px;}
+.chat-empty .ce-sub{font-size:0.82rem;color:var(--muted);line-height:1.5;margin-bottom:16px;}
+.chat-empty .ce-chips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;}
+.chat-empty .ce-chip{background:var(--dash-bg);color:var(--dash);border:1px solid transparent;border-radius:999px;padding:8px 14px;font-size:0.82rem;font-weight:600;cursor:pointer;font-family:inherit;min-height:40px;}
+.chat-empty .ce-chip:hover{border-color:var(--dash);background:#fff;}
 .mhead.confirm h3{display:flex;align-items:center;gap:8px;}
 .mhead.confirm h3 .icn{color:var(--bridge);}
 .icn-bot{width:22px;height:22px;color:#5C6FA3;flex-shrink:0;}

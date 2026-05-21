@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>wj dashboard</title>
 <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
-<link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}?v=17">
+<link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}?v=18">
 </head>
 <body>
 <div class="wrap">
@@ -273,6 +273,6 @@
   window.__INBOX__ = {{ inbox_json_str|safe }};
   window.__TODAY_ISO__ = "{{ today_iso }}";
 </script>
-<script src="{{ url_for('static', filename='dashboard.js') }}?v=15"></script>
+<script src="{{ url_for('static', filename='dashboard.js') }}?v=16"></script>
 </body>
 </html>

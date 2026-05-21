@@ -109,6 +109,23 @@
     document.getElementById("thinking-bubble")?.remove();
   }
 
+  function renderChatEmptyState() {
+    const examples = [
+      "내일 오후 3시 회의 준비",
+      "5/25 논문 초안 마감",
+      "이번주 도서관 자료 정리",
+      "다음주 월요일 세미나 발표 자료",
+    ];
+    $("#chat-body").innerHTML = `
+      <div class="chat-empty">
+        <div class="ce-title">할 일을 자연어로 적어 보세요</div>
+        <div class="ce-sub">날짜·프로젝트를 자동으로 정리해 드립니다. 아래 예시를 눌러 바로 시작할 수 있어요.</div>
+        <div class="ce-chips">
+          ${examples.map(e => `<button type="button" class="ce-chip" data-ex="${escapeHtml(e)}">${escapeHtml(e)}</button>`).join("")}
+        </div>
+      </div>`;
+  }
+
   function openChat(firstMessage) {
     // reset
     chatHistory.length = 0;
@@ -118,6 +135,7 @@
     $("#ov-chat").classList.add("on");
     setTimeout(() => $("#chat-input").focus(), 100);
     if (firstMessage) sendChat(firstMessage);
+    else renderChatEmptyState();
   }
 
   async function sendChat(text) {
@@ -576,6 +594,11 @@
     if (e.key === "Enter") { e.preventDefault(); sendChat(chatIn.value); chatIn.value = ""; }
   });
   chatSend?.addEventListener("click", () => { sendChat(chatIn.value); chatIn.value = ""; });
+  // 빈 상태 예시 칩 클릭 → 그대로 전송
+  $("#chat-body")?.addEventListener("click", e => {
+    const chip = e.target.closest(".ce-chip");
+    if (chip) sendChat(chip.dataset.ex || "");
+  });
 
   // 체크박스 — 완료 표시 (모든 .task-check)
   document.addEventListener("change", async e => {
