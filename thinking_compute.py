@@ -1093,8 +1093,13 @@ def apply_impl_label_to_file(page_path: str, decision_raw: str, status: str) -> 
     decision_raw 는 build_index 의 d['raw'] 와 매칭."""
     LABEL_MAP = {"shipped": "완료", "in_progress": "진행", "planned": "계획"}
     label_ko = LABEL_MAP.get(status, status)
-    full = THINKING_ROOT / page_path
-    if not full.exists():
+    # path traversal 방어 — update_decision_impl 과 동일 패턴 (resolve + relative_to + .md 제한)
+    full = (THINKING_ROOT / page_path).resolve()
+    try:
+        full.relative_to(THINKING_ROOT.resolve())
+    except ValueError:
+        return {"ok": False, "error": "path traversal"}
+    if not full.exists() or full.suffix != ".md":
         return {"ok": False, "error": "file not found"}
     text = full.read_text(encoding="utf-8")
     # decision_raw 가 line 의 일부 (- prefix 제외) 이므로 검색

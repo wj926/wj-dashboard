@@ -28,6 +28,8 @@ import thinking_compute
 
 app = Flask(__name__, static_folder="static", template_folder="templates")
 app.config["TEMPLATES_AUTO_RELOAD"] = True
+# WebSocket keepalive — cloudflared/모바일망 idle 끊김 방지 (claude crunch 2m+ 구간 보호)
+app.config["SOCK_SERVER_OPTIONS"] = {"ping_interval": 25}
 sock = Sock(app)
 
 # 모드 배지를 모든 템플릿에서 접근 가능하게
@@ -62,6 +64,51 @@ def _guard_terminal():
         return Response("terminal disabled in this deployment", 404)
     return None
 
+
+@app.before_request
+def _guard_chat():
+    # chat 기능 끈 배포에서 Claude 챗 endpoint 차단 (설정과 실제 동작 일치)
+    if SETTINGS.enable_chat:
+        return None
+    path = request.path or ""
+    if path in ("/api/chat", "/api/think-chat"):
+        from flask import Response
+        return Response("chat disabled in this deployment", 404)
+    return None
+
+
+def _same_origin_host() -> bool:
+    """state-changing 요청의 Origin/Referer 호스트가 우리 호스트와 같은지.
+    정상 브라우저는 same-origin POST 에 Origin 을 보내고, 외부 공격 페이지는
+    자기 Origin 을 달고 오므로 호스트 불일치로 걸러진다 (CSRF 방어)."""
+    from urllib.parse import urlparse
+    src = request.headers.get("Origin") or request.headers.get("Referer")
+    if not src:
+        return False
+    return urlparse(src).netloc == request.host
+
+
+@app.before_request
+def _csrf_guard():
+    # GET/HEAD/OPTIONS 는 상태를 안 바꾸므로 통과
+    if request.method in ("GET", "HEAD", "OPTIONS"):
+        return None
+    if _same_origin_host():
+        return None
+    from flask import Response
+    return Response("CSRF: origin/referer check failed", 403)
+
+
+@app.before_request
+def _guard_ws_origin():
+    # WebSocket 업그레이드(GET)는 _csrf_guard 를 통과하므로, /ws/ 는 별도로
+    # 업그레이드 전 HTTP 레이어에서 Origin 호스트 일치를 강제 (교차 출처 hijack 차단)
+    if (request.path or "").startswith("/ws/"):
+        if not _same_origin_host():
+            from flask import Response
+            return Response("ws origin check failed", 403)
+    return None
+
 try:
     import markdown as _md
     _MD = _md.Markdown(extensions=["extra", "sane_lists", "nl2br"])
@@ -77,9 +124,16 @@ except Exception:
 app.jinja_env.filters["md"] = _render_md
 
 
+@app.route("/favicon.ico")
+def favicon():
+    # 브라우저 자동 /favicon.ico 요청을 모든 페이지에서 한 번에 처리 (404 콘솔 에러 제거)
+    return app.send_static_file("favicon.svg")
+
+
 @sock.route("/ws/term")
 def ws_term(ws):
-    """PTY terminal — sid 기준으로 영속 세션 attach. sid 미지정 시 'global'."""
+    """PTY terminal — sid 기준으로 영속 세션 attach. sid 미지정 시 'global'.
+    Origin 검증은 _guard_ws_origin(before_request) 에서 업그레이드 전에 처리."""
     sid = request.args.get("sid") or "global"
     terminal_pty.handle_ws(ws, sid=sid)
 
