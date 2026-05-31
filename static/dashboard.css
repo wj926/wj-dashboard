@@ -254,12 +254,12 @@ body{margin:0;font-family:-apple-system,"Apple SD Gothic Neo","Noto Sans KR",san
 
 /* 날짜 모달 내 구글 일정 섹션 */
 .panel .gcal-section{margin-top:14px;padding-top:10px;border-top:1px solid #e6ebf2;}
-.panel .gcal-section-title{font-size:0.8rem;font-weight:700;color:#64748b;margin-bottom:8px;}
+.panel .gcal-section-title{font-size:0.8rem;font-weight:700;color:#4338ca;margin-bottom:8px;}
 .panel .gcal-list{display:flex;flex-direction:column;gap:6px;}
-.panel .gcal-item{display:flex;gap:10px;align-items:flex-start;background:#f3f5f8;border:1px solid #e2e8f0;
-  border-left:3px solid #94a3b8;border-radius:6px;padding:7px 9px;}
-.panel .gcal-time{min-width:44px;font-size:0.75rem;font-weight:700;color:#475569;font-variant-numeric:tabular-nums;}
-.panel .gcal-title{font-size:0.84rem;color:#334155;line-height:1.35;word-break:break-word;}
+.panel .gcal-item{display:flex;gap:10px;align-items:flex-start;background:#eef2ff;border:1px solid #c7d2fe;
+  border-left:3px solid #6366f1;border-radius:6px;padding:7px 9px;}
+.panel .gcal-time{min-width:44px;font-size:0.75rem;font-weight:700;color:#4338ca;font-variant-numeric:tabular-nums;}
+.panel .gcal-title{font-size:0.84rem;color:#312e81;line-height:1.35;word-break:break-word;}
 
 /* ===== task row 편집 버튼 + 인라인 폼 ===== */
 .panel .sd-item .edit-btn{background:transparent;border:1px solid var(--border);color:#6b7785;
@@ -380,11 +380,16 @@ body{margin:0;font-family:-apple-system,"Apple SD Gothic Neo","Noto Sans KR",san
 
 /* 구글 일정 셀 오버레이 (읽기 전용, 회색 톤으로 task 와 구분) */
 .cal .c .cell-gcal-list{display:flex;flex-direction:column;gap:1px;margin-top:1px;}
-.cal .c .cell-gcal{font-size:0.58rem;line-height:1.2;color:#4b5563;background:#eef1f5;
-  border-left:2px solid #94a3b8;border-radius:2px;padding:1px 3px;overflow:hidden;
+/* 구글 일정 = 인디고(할일/프로젝트 색과 확실히 구분) */
+.cal .c .cell-gcal{font-size:0.58rem;line-height:1.2;color:#4338ca;background:#eef2ff;
+  border-left:2px solid #6366f1;border-radius:2px;padding:1px 3px;overflow:hidden;
   white-space:nowrap;text-overflow:ellipsis;}
-.cal .c .cell-gcal b{font-weight:700;color:#334155;}
-.cal .c .cell-gcal-more{font-size:0.54rem;color:#94a3b8;font-weight:700;padding:0 2px;}
+.cal .c .cell-gcal b{font-weight:700;color:#4338ca;}
+.cal .c .cell-gcal-more{font-size:0.54rem;color:#6366f1;font-weight:700;padding:0 2px;}
+
+/* ===== 달력 필터: 전체 / 할일만 / 일정만 ===== */
+#bento.filt-todo .cal .c .cell-gcal-list{display:none;}
+#bento.filt-event .cal .c .cell-tasks{display:none;}
 
 /* 다가오는 일정 타일 (일정 모드에서만 노출) */
 .agenda-tile{display:none;}

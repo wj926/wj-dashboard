@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>wj dashboard</title>
 <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
-<link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}?v=22">
+<link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}?v=23">
 </head>
 <body>
 <div class="wrap">
@@ -14,12 +14,16 @@
   <div class="topbar">
     <span class="brand">wj<span class="dot">.</span></span>
     {% include "_tabs.html" %}
-    <div class="view-toggle" id="view-toggle" title="할일 목록 / 달력 일정 보기 전환">
-      <button type="button" class="vt on" data-view="todo">
+    <div class="view-toggle" id="view-toggle" title="달력 표시 필터: 전체 / 할일만 / 일정만">
+      <button type="button" class="vt on" data-filter="all">
+        <svg class="vt-icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        전체
+      </button>
+      <button type="button" class="vt" data-filter="todo">
         <svg class="vt-icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
         할일
       </button>
-      <button type="button" class="vt" data-view="schedule">
+      <button type="button" class="vt" data-filter="event">
         <svg class="vt-icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
         일정
       </button>
@@ -54,6 +58,7 @@
             <span class="lr"><span class="dot" style="background:{{ p.color.bg }};border:1px solid {{ p.color.border }};"></span>{{ p.title.split(' ')[0]|truncate(6, True, '') }}</span>
           {% endfor %}
           <span class="lr"><span class="dot" style="background:#f1f5f9;border:1px solid #cbd5e1;"></span>Inbox</span>
+          <span class="lr"><span class="dot" style="background:#eef2ff;border:1px solid #6366f1;"></span>📅 구글 일정</span>
           <span class="lr"><span class="dot" style="background:var(--overdue);width:3px;height:14px;border-radius:1px;"></span>임박 (좌측 보더)</span>
         </div>
       </div>
@@ -328,24 +333,29 @@
   window.__TODAY_ISO__ = "{{ today_iso }}";
 </script>
 <script>
-  // 할일/일정 보기 토글 (프론트 전용, localStorage 유지)
+  // 달력 표시 필터: 전체 / 할일만 / 일정만 (프론트 전용, localStorage 유지)
   (function () {
     var bento = document.getElementById("bento");
     var toggle = document.getElementById("view-toggle");
     if (!bento || !toggle) return;
-    function apply(view) {
-      bento.classList.toggle("mode-schedule", view === "schedule");
+    function apply(filter) {
+      if (filter !== "todo" && filter !== "event") filter = "all";
+      bento.classList.toggle("filt-todo", filter === "todo");
+      bento.classList.toggle("filt-event", filter === "event");
+      bento.classList.toggle("filt-all", filter === "all");
+      // 일정만 볼 땐 달력 크게 + 다가오는 일정 패널 (기존 일정 레이아웃 재사용)
+      bento.classList.toggle("mode-schedule", filter === "event");
       toggle.querySelectorAll(".vt").forEach(function (b) {
-        b.classList.toggle("on", b.dataset.view === view);
+        b.classList.toggle("on", b.dataset.filter === filter);
       });
-      try { localStorage.setItem("wj_view", view); } catch (e) {}
+      try { localStorage.setItem("wj_calfilter", filter); } catch (e) {}
     }
     toggle.addEventListener("click", function (e) {
       var b = e.target.closest(".vt");
-      if (b) apply(b.dataset.view);
+      if (b) apply(b.dataset.filter);
     });
-    var saved = "todo";
-    try { saved = localStorage.getItem("wj_view") || "todo"; } catch (e) {}
+    var saved = "all";
+    try { saved = localStorage.getItem("wj_calfilter") || "all"; } catch (e) {}
     apply(saved);
   })();
 
