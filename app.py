@@ -23,6 +23,7 @@ from flask_sock import Sock
 from settings import SETTINGS
 
 import compute
+import gcal
 import terminal_pty
 import thinking_compute
 
@@ -254,6 +255,18 @@ def index():
     view["projects_json_str"] = json.dumps(view["projects_json"], ensure_ascii=False)
     view["inbox_json_str"] = json.dumps(view["inbox_json"], ensure_ascii=False)
     view["active_tab"] = "work"
+    # 구글 캘린더 읽기 전용 오버레이 (실패해도 빈 값)
+    try:
+        view["gcal_by_day"] = gcal.events_by_day(today, view_year, view_month)
+        view["gcal_agenda"] = gcal.agenda(today)
+    except Exception:
+        view["gcal_by_day"] = {}
+        view["gcal_agenda"] = []
+    # JS 주입용: 날짜별 구글 일정(시간/제목) 맵
+    gcal_js = {}
+    for iso, evs in (view.get("gcal_by_day") or {}).items():
+        gcal_js[iso] = [{"time": e.get("time"), "title": e.get("title")} for e in (evs or [])]
+    view["gcal_json_str"] = json.dumps(gcal_js, ensure_ascii=False)
     return render_template("index.html", **view)
 
 

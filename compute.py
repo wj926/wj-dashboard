@@ -708,6 +708,7 @@ def build_month_grid(year: int, month: int, by_day: dict, today: date) -> list[l
                     # 각 task: 색·제목 같이 (프로젝트별 색)
                     cell["tasks_view"] = [
                         {
+                            "id": t.get("id", ""),
                             "title": t.get("title", ""),
                             "color": t.get("color", INBOX_COLOR),
                             "urgency": t.get("urgency", "none"),

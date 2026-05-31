@@ -108,17 +108,20 @@ body{margin:0;font-family:-apple-system,"Apple SD Gothic Neo","Noto Sans KR",san
 
   /* 캘린더 셀: 텍스트 숨김, 색 띠만 */
   .cal{gap:2px;}
-  .cal .c{padding:3px 3px 3px;aspect-ratio:1/1;border-radius:5px;}
+  .cal .c{padding:3px 3px 3px;aspect-ratio:auto;min-height:46px;height:auto;border-radius:5px;}
   .cal .h{font-size:0.66rem;padding:3px 0;}
   .cal .c .d{font-size:0.78rem;}
   .cal .c .urg-dot{width:5px;height:5px;}
   .cal .c .cell-title{
-    font-size:0;
-    height:3px;
-    line-height:3px;
-    padding:0;
-    border-radius:2px;
+    font-size:0.56rem;
+    line-height:1.25;
+    height:auto;
+    padding:1px 3px;
+    border-radius:3px;
     margin:1px 0 0;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
     -webkit-line-clamp:initial;
   }
   .cal .c .cell-more{font-size:0.54rem;text-align:center;margin-top:2px;}
@@ -249,6 +252,15 @@ body{margin:0;font-family:-apple-system,"Apple SD Gothic Neo","Noto Sans KR",san
 .panel .sd-item.is-done .title{text-decoration:line-through;opacity:0.5;}
 .panel .sd-item .sd-check{margin-top:2px;}
 
+/* 날짜 모달 내 구글 일정 섹션 */
+.panel .gcal-section{margin-top:14px;padding-top:10px;border-top:1px solid #e6ebf2;}
+.panel .gcal-section-title{font-size:0.8rem;font-weight:700;color:#64748b;margin-bottom:8px;}
+.panel .gcal-list{display:flex;flex-direction:column;gap:6px;}
+.panel .gcal-item{display:flex;gap:10px;align-items:flex-start;background:#f3f5f8;border:1px solid #e2e8f0;
+  border-left:3px solid #94a3b8;border-radius:6px;padding:7px 9px;}
+.panel .gcal-time{min-width:44px;font-size:0.75rem;font-weight:700;color:#475569;font-variant-numeric:tabular-nums;}
+.panel .gcal-title{font-size:0.84rem;color:#334155;line-height:1.35;word-break:break-word;}
+
 /* ===== task row 편집 버튼 + 인라인 폼 ===== */
 .panel .sd-item .edit-btn{background:transparent;border:1px solid var(--border);color:#6b7785;
   border-radius:6px;width:28px;height:28px;font-size:0.95rem;cursor:pointer;flex-shrink:0;
@@ -347,3 +359,55 @@ body{margin:0;font-family:-apple-system,"Apple SD Gothic Neo","Noto Sans KR",san
 .tt:hover{background:rgba(255,255,255,0.08);color:#cbd5e1;}
 .tt.on{background:#fff;color:var(--navy);box-shadow:0 2px 6px rgba(0,0,0,0.18);}
 .tt-icn{width:16px;height:16px;flex-shrink:0;}
+
+/* ===== 할일/일정 보기 토글 ===== */
+.view-toggle{display:inline-flex;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:3px;gap:2px;flex-shrink:0;}
+.view-toggle .vt{background:transparent;border:none;color:#94a3b8;font-family:inherit;font-size:0.82rem;font-weight:700;padding:5px 14px;border-radius:6px;cursor:pointer;transition:all 0.1s;}
+.view-toggle .vt:hover{color:#cbd5e1;}
+.view-toggle .vt.on{background:#fff;color:var(--navy);box-shadow:0 2px 6px rgba(0,0,0,0.18);}
+
+.view-toggle .vt-icn{width:15px;height:15px;flex-shrink:0;}
+.view-toggle .vt{display:inline-flex;align-items:center;gap:5px;}
+
+/* 일정 모드: 달력 hero + 다가오는 일정, 할일 타일 숨김 */
+.bento.mode-schedule > .tile:not(.cal-tile):not(.agenda-tile){display:none;}
+.bento.mode-schedule .tile.cal-tile{grid-column:span 4;grid-row:auto;}
+.bento.mode-schedule .tile.agenda-tile{display:block;grid-column:span 2;}
+@media (max-width: 900px){
+  .bento.mode-schedule .tile.cal-tile{grid-column:span 2;}
+  .bento.mode-schedule .tile.agenda-tile{grid-column:span 2;}
+}
+
+/* 구글 일정 셀 오버레이 (읽기 전용, 회색 톤으로 task 와 구분) */
+.cal .c .cell-gcal-list{display:flex;flex-direction:column;gap:1px;margin-top:1px;}
+.cal .c .cell-gcal{font-size:0.58rem;line-height:1.2;color:#4b5563;background:#eef1f5;
+  border-left:2px solid #94a3b8;border-radius:2px;padding:1px 3px;overflow:hidden;
+  white-space:nowrap;text-overflow:ellipsis;}
+.cal .c .cell-gcal b{font-weight:700;color:#334155;}
+.cal .c .cell-gcal-more{font-size:0.54rem;color:#94a3b8;font-weight:700;padding:0 2px;}
+
+/* 다가오는 일정 타일 (일정 모드에서만 노출) */
+.agenda-tile{display:none;}
+.agenda-tile .agenda-row{display:flex;align-items:baseline;gap:8px;padding:6px 0;border-bottom:1px solid #f0f3f6;font-size:0.82rem;}
+.agenda-tile .agenda-row:last-child{border-bottom:none;}
+.agenda-tile .agenda-date{font-weight:700;color:var(--navy);min-width:38px;font-variant-numeric:tabular-nums;}
+.agenda-tile .agenda-time{color:#94a3b8;min-width:42px;font-size:0.76rem;font-variant-numeric:tabular-nums;}
+.agenda-tile .agenda-title{color:#243038;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.agenda-tile .agenda-empty{color:var(--muted);font-size:0.82rem;}
+
+/* ===== F1: 완료 보기 토글 / done-zone ===== */
+.done-toggle{display:inline-block;margin-top:9px;background:none;border:none;color:var(--muted);font-family:inherit;font-size:0.74rem;font-weight:600;cursor:pointer;padding:3px 0;text-decoration:underline;text-underline-offset:2px;}
+.done-toggle:hover{color:var(--navy);}
+.done-zone{margin-top:4px;}
+.done-zone.collapsed{display:none;}
+.done-zone .task-item.is-done .t{text-decoration:line-through;color:#9aa6b2;}
+
+/* ===== F3: 아이패드(769~900px) 상단바 줄바꿈 + 터치 타겟 ===== */
+@media (max-width: 900px){
+  .topbar{flex-wrap:wrap;row-gap:8px;align-items:center;}
+  .quick{flex:1 1 100%;order:5;max-width:none;}
+  .view-toggle .vt{min-height:40px;}
+  .top-tabs .tt{min-height:40px;}
+  .filters .f{min-height:40px;display:flex;align-items:center;}
+  #quick-chat{min-height:40px;}
+}

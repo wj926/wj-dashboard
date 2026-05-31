@@ -4,6 +4,7 @@
   const byDay = window.__BY_DAY__ || {};
   const projects = window.__PROJECTS__ || {};
   const inbox = window.__INBOX__ || [];
+  const gcalByDay = window.__GCAL__ || {};
   const todayISO = window.__TODAY_ISO__;
 
   // ============ 유틸 ============
@@ -44,7 +45,7 @@
     el.style.background = type === "err" ? "#b02a37" : type === "ok" ? "#1b6e4f" : "#1f3a5f";
     el.style.display = "block";
     clearTimeout(toast._t);
-    toast._t = setTimeout(() => el.style.display = "none", 2500);
+    toast._t = setTimeout(() => el.style.display = "none", type === "err" ? 6000 : 2500);
   }
 
   async function api(path, opts) {
@@ -185,6 +186,7 @@
       chatHistory.push({ role: "assistant", content: reply });
     } catch (e) {
       removeThinking();
+      appendBubble(`⚠ 호출 실패: ${escapeHtml(e.message || "네트워크 오류")} — 다시 시도하거나 위쪽 '추가'로 바로 등록해 보세요.`, "bot");
     } finally {
       $("#chat-input").disabled = false;
       $("#chat-send").disabled = false;
@@ -227,17 +229,30 @@
   // ============ 캘린더 날짜 모달 ============
   function openDayModal(iso) {
     const tasks = byDay[iso] || [];
+    const gcalEvents = gcalByDay[iso] || [];
     const [y, m, d] = iso.split("-").map(Number);
     const dow = dowKr(iso);
     const isToday = iso === todayISO;
     $("#ov-day-title").textContent = `${m}월 ${d}일 (${dow}요일)` + (isToday ? " · 오늘" : "");
     const body = $("#ov-day-body");
-    if (tasks.length === 0) {
+    if (tasks.length === 0 && gcalEvents.length === 0) {
       body.innerHTML = '<p style="color:#888;padding:20px 0;text-align:center;">이 날 등록된 일 없음.</p>';
     } else {
-      body.innerHTML = `<p style="color:#6b7785;font-size:0.82rem;margin:0 0 10px;">${tasks.length}건의 task</p>` +
-        tasks.map((t, i) => taskItemHtml(t, i + 1)).join("");
-      bindTaskActions(body);
+      let html = "";
+      if (tasks.length > 0) {
+        html += `<p style="color:#6b7785;font-size:0.82rem;margin:0 0 10px;">${tasks.length}건의 task</p>`;
+        html += tasks.map((t, i) => taskItemHtml(t, i + 1)).join("");
+      }
+      if (gcalEvents.length > 0) {
+        html += `<div class="gcal-section">
+          <div class="gcal-section-title">📅 구글 일정</div>
+          <div class="gcal-list">
+            ${gcalEvents.map(ev => `<div class="gcal-item"><span class="gcal-time">${escapeHtml(ev.time || "종일")}</span><span class="gcal-title">${escapeHtml(ev.title || "(제목 없음)")}</span></div>`).join("")}
+          </div>
+        </div>`;
+      }
+      body.innerHTML = html;
+      if (tasks.length > 0) bindTaskActions(body);
     }
     $("#ov-day").classList.add("on");
   }
@@ -570,22 +585,39 @@
     }
   }
 
-  // 상단 입력창 — 챗봇 열기
+  // 상단 입력창 — 정규식 즉시추가 (챗 없이 바로 저장)
   const qIn = $("#quick-input");
   const qBtn = $("#quick-add");
-  function submitQuick() {
+  async function submitQuick() {
     const text = qIn.value.trim();
     if (!text) {
-      openChat();  // 빈 입력이면 그냥 챗봇만 열기
+      openChat();  // 빈 입력이면 챗봇만 열기
       return;
     }
-    qIn.value = "";
-    openChat(text);
+    qIn.disabled = true;
+    qBtn.disabled = true;
+    try {
+      const r = await api("/api/task", {
+        method: "POST",
+        body: JSON.stringify({ text }),
+      });
+      qIn.value = "";
+      const due = r.due_at ? ` · ${r.due_at}` : "";
+      toast(`✓ 추가됨 — ${r.title || text}${due}`, "ok");
+      reloadSoon();
+    } catch (e) {
+      // api() 가 이미 에러 토스트 표시. 입력은 살려둬서 재시도 가능.
+    } finally {
+      qIn.disabled = false;
+      qBtn.disabled = false;
+    }
   }
   qIn?.addEventListener("keydown", e => {
     if (e.key === "Enter") { e.preventDefault(); submitQuick(); }
   });
   qBtn?.addEventListener("click", submitQuick);
+  // AI 챗으로 추가 (애매한 입력 정리용)
+  $("#quick-chat")?.addEventListener("click", () => openChat(qIn.value.trim()));
 
   // 챗봇 패널 입력
   const chatIn = $("#chat-input");
