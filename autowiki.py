@@ -17,6 +17,8 @@ from thinking_compute import THINKING_ROOT, RAW_ROOT, WIKI_ROOT, build_index
 DRAFT_ROOT = THINKING_ROOT / "_autowiki_drafts"
 SEED_CATEGORIES = {"회사", "연구", "제안서", "랩문화", "개인", "시스템"}
 MERGE_LEDGER_PATH = THINKING_ROOT / "_autowiki_drafts" / "merge_ledger.json"
+AUTOWIKI_EXCLUDE_RAW = {"2026-06-01"}
+AUTOWIKI_EXCLUDE_SLUGS = {"모닝논문", "모딕논문"}
 
 
 @dataclass
@@ -39,6 +41,25 @@ def _slugify(text: str) -> str:
     s = re.sub(r"[^0-9A-Za-z가-힣_-]", "", s)
     s = re.sub(r"-+", "-", s).strip("-")
     return s or "untitled"
+
+
+def _is_excluded_raw_date(raw_date: str) -> bool:
+    return raw_date in AUTOWIKI_EXCLUDE_RAW
+
+
+def _is_excluded_slug(slug: str | None) -> bool:
+    return bool(slug and slug.strip() in AUTOWIKI_EXCLUDE_SLUGS)
+
+
+def is_excluded_target(target: dict[str, Any]) -> bool:
+    kind = (target or {}).get("kind")
+    if kind == "existing":
+        rel_path = str((target or {}).get("rel_path") or "")
+        rel_slug = Path(rel_path).stem if rel_path else ""
+        return _is_excluded_slug(rel_slug)
+    if kind == "new":
+        return _is_excluded_slug((target or {}).get("slug"))
+    return False
 
 
 def _parse_raw_sections(raw_path: Path) -> list[dict[str, Any]]:
@@ -188,6 +209,8 @@ def generate_drafts(raw_rel_or_date: str, phraser: Callable[[str, str, str | Non
         raise FileNotFoundError(f"raw 파일 없음: {raw_path}")
 
     raw_date = raw_path.stem
+    if _is_excluded_raw_date(raw_date):
+        raise ValueError(f"보호된 raw 날짜는 draft 생성 불가: {raw_date}")
     phr = phraser or _default_phraser
     lookup = _build_page_lookup()
 
@@ -196,6 +219,8 @@ def generate_drafts(raw_rel_or_date: str, phraser: Callable[[str, str, str | Non
     for item in _parse_raw_sections(raw_path):
         mention = item["mentions"][0] if item["mentions"] else None
         target, needs_confirm, warnings = _resolve_target(mention, lookup, raw_date)
+        if is_excluded_target(target):
+            continue
 
         phrased = phr(item["line"], raw_date, mention)
         proposed = {
@@ -470,6 +495,8 @@ def apply_proposal(proposal: dict[str, Any] | Proposal, wiki_root: Path = WIKI_R
 
     if p.get("needs_user_confirm"):
         return {"ok": False, "changed": False, "reason": "사용자 승인 필요"}
+    if is_excluded_target(p.get("target") or {}):
+        return {"ok": False, "changed": False, "reason": "보호 대상(모닝논문) 차단"}
     kind = p.get("target", {}).get("kind")
     if kind == "unsure":
         return {"ok": False, "changed": False, "reason": "target unsure"}

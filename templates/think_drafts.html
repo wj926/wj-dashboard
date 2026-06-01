@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>wj · 자동 제안 리뷰</title>
+<link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
+<link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}?v=15">
+<link rel="stylesheet" href="{{ url_for('static', filename='thinking.css') }}?v=31">
+<style>
+  body { background:#f1f4f8; }
+  .panel { max-width:1200px; margin:14px auto; padding:0 24px; }
+  .head { display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:10px; }
+  .head h2 { margin:0; color:var(--navy); font-size:1.2rem; }
+  .warn { background:#fff7ed; border:1px solid #fdba74; color:#9a3412; border-radius:10px; padding:10px 12px; font-size:0.83rem; }
+  .controls { display:flex; gap:8px; flex-wrap:wrap; margin:10px 0 14px; }
+  .controls select, .controls button { height:36px; border-radius:8px; border:1px solid #cbd5e1; padding:0 10px; }
+  .controls button { border:none; font-weight:700; cursor:pointer; }
+  .btn-gen { background:#0f766e; color:#fff; }
+  .btn-apply { background:#2563eb; color:#fff; }
+  .meta { color:var(--muted); font-size:0.78rem; margin:8px 0; }
+  .list { display:grid; gap:10px; }
+  .item { background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:12px; }
+  .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:6px; }
+  .badge { font-size:0.7rem; border-radius:999px; padding:2px 8px; font-weight:700; }
+  .b-confirm { background:#fef3c7; color:#92400e; }
+  .b-kind { background:#e2e8f0; color:#334155; }
+  pre { margin:0; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:10px; font-size:0.76rem; white-space:pre-wrap; }
+  .result { margin-top:10px; font-size:0.8rem; white-space:pre-wrap; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <span class="brand">wj<span class="dot">.</span></span>
+    {% include "_tabs.html" %}
+    <span class="topright"><a href="/think" style="text-decoration:none;color:var(--muted);font-size:0.78rem;">← think</a></span>
+  </div>
+
+  <div class="panel">
+    <div class="head">
+      <h2>🧪 자동 제안 리뷰·승인</h2>
+      <span class="meta">draft/generated: {{ draft_payload.generated_at if draft_payload else '-' }} · proposals: {{ proposals|length }}</span>
+    </div>
+    <div class="warn">승인하면 위키에 추가됩니다(되돌리려면 git). GET은 read-only이며 자동 승인/자동 반영은 없습니다.</div>
+    <div class="meta">보호 raw: {{ protected_raw|join(', ') }} · 보호 slug: {{ protected_slugs|join(', ') }}</div>
+
+    <div class="controls">
+      <select id="raw-date">
+        {% for d in raw_dates %}
+          <option value="{{ d }}" {% if d == default_raw_date %}selected{% endif %}>{{ d }}</option>
+        {% endfor %}
+      </select>
+      <button class="btn-gen" id="btn-generate">지금 draft 생성</button>
+      <button class="btn-apply" id="btn-apply">선택 승인 적용</button>
+    </div>
+
+    <div class="list" id="proposal-list">
+      {% for p in proposals %}
+      <div class="item">
+        <div class="row">
+          <input type="checkbox" class="pick" value="{{ p.ingest_id }}">
+          <code>{{ p.ingest_id }}</code>
+          <span class="badge b-kind">{{ p.target.kind }}</span>
+          {% if p.needs_user_confirm %}<span class="badge b-confirm">needs_user_confirm</span>{% endif %}
+        </div>
+        <div class="meta">source: {{ p.raw_source }} · excerpt: {{ p.raw_excerpt }}</div>
+        <div class="meta">target: {{ p.target.rel_path or ('new/' ~ (p.target.slug or 'unsure')) }}</div>
+        <pre>timeline_add:
+{{ p.proposed.timeline_add or '' }}
+
+decisions_add:
+{% for v in p.proposed.decisions_add or [] %}- {{ v }}
+{% endfor %}
+todos_add:
+{% for v in p.proposed.todos_add or [] %}- {{ v }}
+{% endfor %}
+open_q_add:
+{% for v in p.proposed.open_q_add or [] %}- {{ v }}
+{% endfor %}</pre>
+        {% if p.warnings %}<div class="meta">warnings: {{ p.warnings|join(' | ') }}</div>{% endif %}
+      </div>
+      {% else %}
+      <div class="item"><div class="meta">표시할 draft proposal 이 없습니다.</div></div>
+      {% endfor %}
+    </div>
+
+    <div id="result" class="result"></div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const result = document.getElementById('result');
+  const dateSel = document.getElementById('raw-date');
+  const loadedDate = ({{ (draft_payload.generated_at if draft_payload else '')|tojson }} || '').trim();
+
+  async function postJson(url, payload) {
+    const r = await fetch(url, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload || {})
+    });
+    return {status: r.status, body: await r.json().catch(() => ({}))};
+  }
+
+  document.getElementById('btn-generate').addEventListener('click', async () => {
+    result.textContent = 'draft 생성 중...';
+    const pick = (dateSel && dateSel.value) || '';
+    const {status, body} = await postJson('/api/autowiki/generate', {date: pick});
+    result.textContent = `[generate] HTTP ${status}\n` + JSON.stringify(body, null, 2);
+    if (body && body.ok) location.reload();
+  });
+
+  document.getElementById('btn-apply').addEventListener('click', async () => {
+    const ids = Array.from(document.querySelectorAll('.pick:checked')).map(el => el.value);
+    if (!ids.length) {
+      result.textContent = '적용할 항목을 선택하세요.';
+      return;
+    }
+    const draftDate = loadedDate || ((dateSel && dateSel.value) || '');
+    if (!draftDate) {
+      result.textContent = 'draft date 확인 실패';
+      return;
+    }
+    result.textContent = '선택 항목 적용 중...';
+    const {status, body} = await postJson('/api/autowiki/apply', {date: draftDate, ids});
+    result.textContent = `[apply] HTTP ${status}\n` + JSON.stringify(body, null, 2);
+  });
+})();
+</script>
+</body>
+</html>

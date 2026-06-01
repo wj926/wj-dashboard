@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 import os
 from datetime import date
+from pathlib import Path
 
 from flask import Flask, jsonify, render_template, request
 from flask_sock import Sock
@@ -26,6 +27,7 @@ import compute
 import gcal
 import terminal_pty
 import thinking_compute
+import autowiki
 
 app = Flask(__name__, static_folder="static", template_folder="templates")
 app.config["TEMPLATES_AUTO_RELOAD"] = True
@@ -278,6 +280,137 @@ def think_index():
     h = thinking_compute.build_hierarchy_data()
     return render_template("think_spotlight.html",
                            today=today, data=data, h=h, active_tab="think")
+
+
+def _list_raw_dates_desc() -> list[str]:
+    out = []
+    for p in sorted(thinking_compute.RAW_ROOT.glob("*.md"), reverse=True):
+        out.append(p.stem)
+    return out
+
+
+def _pick_default_raw_date() -> str | None:
+    # 모닝논문 보호 날짜는 기본 선택에서 제외
+    for d in _list_raw_dates_desc():
+        if d not in autowiki.AUTOWIKI_EXCLUDE_RAW:
+            return d
+    return None
+
+
+def _latest_draft_path() -> str | None:
+    root = autowiki.DRAFT_ROOT
+    if not root.exists():
+        return None
+    files = sorted(root.glob("*.json"), reverse=True)
+    return str(files[0]) if files else None
+
+
+def _draft_path_by_date(date_str: str) -> str:
+    return str(autowiki.DRAFT_ROOT / f"{date_str}.json")
+
+
+@app.route("/think/drafts")
+def think_drafts():
+    # 리뷰 화면(GET)은 항상 read-only. 위키 반영은 POST에서만 수행.
+    latest = _latest_draft_path()
+    payload = None
+    if latest and os.path.exists(latest):
+        try:
+            payload = json.loads(Path(latest).read_text(encoding="utf-8"))
+        except Exception:
+            payload = None
+    proposals = (payload or {}).get("proposals") or []
+    return render_template(
+        "think_drafts.html",
+        active_tab="think",
+        draft_payload=payload,
+        proposals=proposals,
+        raw_dates=_list_raw_dates_desc(),
+        default_raw_date=_pick_default_raw_date(),
+        protected_raw=sorted(autowiki.AUTOWIKI_EXCLUDE_RAW),
+        protected_slugs=sorted(autowiki.AUTOWIKI_EXCLUDE_SLUGS),
+    )
+
+
+@app.post("/api/autowiki/generate")
+def api_autowiki_generate():
+    body = request.get_json(silent=True) or {}
+    req_date = (body.get("date") or "").strip()
+    pick_date = req_date or _pick_default_raw_date()
+    if not pick_date:
+        return jsonify({"ok": False, "error": "생성 가능한 raw 날짜가 없습니다"}), 400
+    if pick_date in autowiki.AUTOWIKI_EXCLUDE_RAW:
+        return jsonify({"ok": False, "error": f"보호된 raw 날짜는 생성 불가: {pick_date}"}), 400
+    raw_path = thinking_compute.RAW_ROOT / f"{pick_date}.md"
+    if not raw_path.exists():
+        return jsonify({"ok": False, "error": f"raw 파일 없음: {pick_date}"}), 404
+    try:
+        proposals = autowiki.generate_drafts(pick_date)
+        out = autowiki.write_drafts(proposals)
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+    return jsonify(
+        {
+            "ok": True,
+            "date": pick_date,
+            "draft_path": out,
+            "count": len(proposals),
+            "protected_raw": sorted(autowiki.AUTOWIKI_EXCLUDE_RAW),
+        }
+    )
+
+
+@app.post("/api/autowiki/apply")
+def api_autowiki_apply():
+    body = request.get_json(silent=True) or {}
+    draft_date = (body.get("date") or "").strip()
+    ids = body.get("ids") or []
+    if not draft_date:
+        return jsonify({"ok": False, "error": "date required"}), 400
+    if not isinstance(ids, list) or not all(isinstance(x, str) for x in ids):
+        return jsonify({"ok": False, "error": "ids(list[str]) required"}), 400
+    draft_path = _draft_path_by_date(draft_date)
+    if not os.path.exists(draft_path):
+        return jsonify({"ok": False, "error": f"draft 없음: {draft_date}"}), 404
+
+    payload = json.loads(Path(draft_path).read_text(encoding="utf-8"))
+    proposals = payload.get("proposals") or []
+    by_id = {p.get("ingest_id"): p for p in proposals if p.get("ingest_id")}
+
+    allowed_ids: list[str] = []
+    pre_results: list[dict] = []
+    for ingest_id in ids:
+        prop = by_id.get(ingest_id)
+        if not prop:
+            pre_results.append({"ingest_id": ingest_id, "ok": False, "changed": False, "reason": "draft에 없는 id"})
+            continue
+        if autowiki.is_excluded_target(prop.get("target") or {}):
+            pre_results.append({"ingest_id": ingest_id, "ok": False, "changed": False, "reason": "보호 대상(모닝논문) 차단"})
+            continue
+        allowed_ids.append(ingest_id)
+
+    batch = autowiki.apply_batch(draft_path, only_ids=allowed_ids) if allowed_ids else {"ok": True, "count": 0, "applied": 0, "results": []}
+    batch_by_id = {r.get("ingest_id"): r for r in (batch.get("results") or [])}
+    merged_results: list[dict] = []
+    for ingest_id in ids:
+        in_batch = batch_by_id.get(ingest_id)
+        if in_batch:
+            merged_results.append(in_batch)
+            continue
+        pre = next((x for x in pre_results if x.get("ingest_id") == ingest_id), None)
+        if pre:
+            merged_results.append(pre)
+
+    return jsonify(
+        {
+            "ok": all(r.get("ok") for r in merged_results) if merged_results else True,
+            "date": draft_date,
+            "requested": len(ids),
+            "allowed": len(allowed_ids),
+            "applied": sum(1 for r in merged_results if r.get("changed")),
+            "results": merged_results,
+        }
+    )
 
 
 @app.route("/think/legacy")
