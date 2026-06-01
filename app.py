@@ -72,7 +72,7 @@ def _guard_chat():
     if SETTINGS.enable_chat:
         return None
     path = request.path or ""
-    if path in ("/api/chat", "/api/think-chat"):
+    if path == "/api/chat":
         from flask import Response
         return Response("chat disabled in this deployment", 404)
     return None
@@ -358,33 +358,6 @@ def combo_n(n: int):
     meta = COMBOS[n-1]
     return render_template(f"combos/c{n:02d}_{meta['code'].lower()}.html",
                            data=data, meta=meta, combos=COMBOS, n=n, active_tab="think")
-
-
-CHAT_SPOTS = [
-    {"id":"a","name":"우측 탭 토글",   "desc":"River 자리에 [River|Chat] 탭. 평소엔 River, 클릭하면 Chat. 양쪽 균형."},
-    {"id":"b","name":"하단 sticky 바",  "desc":"Pipeline strip 위에 항상 보이는 textarea. 막 던지기 최적, 흐름 안 끊김."},
-    {"id":"c","name":"떠다니는 모달",   "desc":"우하단 ↗ floating 버튼 → 모달. 평소 화면 침범 0, 호출 1클릭."},
-    {"id":"d","name":"우측 drawer",     "desc":"우측 슬라이드 패널. iPad/PC 둘 다 자연스러움. 본문과 공존."},
-    {"id":"e","name":"상단 hero 입력",  "desc":"Focus 카드 위에 큰 textarea + 최근 raw 미리보기. '오늘 뭐 던질래?' 초대형."},
-]
-
-
-@app.route("/chat-spots")
-def chat_spots_index():
-    today = date.today()
-    data = thinking_compute.build_mockup_data(today)
-    return render_template("chat_spots/index.html", data=data, spots=CHAT_SPOTS, active_tab="think")
-
-
-@app.route("/chat-spots/<variant>")
-def chat_spot_variant(variant: str):
-    valid = [s["id"] for s in CHAT_SPOTS]
-    if variant not in valid:
-        return "not found", 404
-    today = date.today()
-    data = thinking_compute.build_mockup_data(today)
-    spot = next(s for s in CHAT_SPOTS if s["id"] == variant)
-    return render_template(f"chat_spots/cs_{variant}.html", data=data, spot=spot, spots=CHAT_SPOTS, active_tab="think")
 
 
 @app.route("/mockups")
@@ -680,33 +653,6 @@ def _related_tasks(page_title: str | None) -> dict:
     }
 
 
-@app.route("/think/chat")
-def think_chat_global():
-    """전역 풀스크린 대화."""
-    today = date.today()
-    idx = thinking_compute.build_index(today)
-    return render_template("chat/page.html",
-                           mode="global", page=None, idx=idx,
-                           active_tab="think")
-
-
-@app.route("/think/chat/page/<path:rel_path>")
-def think_chat_context(rel_path: str):
-    """컨텍스트 (특정 페이지) 풀스크린 대화."""
-    today = date.today()
-    page = thinking_compute.get_page_by_path(rel_path)
-    if not page:
-        return "Page not found", 404
-    idx = thinking_compute.build_index(today)
-    decisions = thinking_compute.parse_decisions(page["sections"].get("decisions", ""))
-    todos = thinking_compute.parse_todos(page["sections"].get("todos", ""))
-    timeline = thinking_compute.parse_timeline(page["sections"].get("timeline", ""))
-    return render_template("chat/page.html",
-                           mode="context", page=page, decisions=decisions,
-                           todos=todos, timeline=timeline, idx=idx,
-                           active_tab="think")
-
-
 @app.route("/api/version")
 def version():
     try:
@@ -725,23 +671,6 @@ def task_parse():
         return jsonify({"ok": False, "error": "text required"}), 400
     today = date.today()
     return jsonify(compute.preview_task_from_text(text, today))
-
-
-@app.post("/api/think-chat")
-def think_chat_api():
-    """thinking 챗봇 — 자연어 대화. 사용자 발화는 raw 에 자동 append."""
-    body = request.get_json(silent=True) or {}
-    messages = body.get("messages") or []
-    if not messages:
-        return jsonify({"ok": False, "error": "messages required"}), 400
-    # 마지막 user 메시지 raw append
-    last_user = next((m for m in reversed(messages) if m.get("role") == "user"), None)
-    raw_info = None
-    if last_user and last_user.get("content"):
-        raw_info = thinking_compute.append_raw(last_user["content"])
-    result = thinking_compute.think_chat(messages)
-    result["raw"] = raw_info
-    return jsonify(result)
 
 
 @app.post("/api/chat")

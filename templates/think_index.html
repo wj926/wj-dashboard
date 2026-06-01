@@ -14,7 +14,6 @@
     <span class="brand">wj<span class="dot">.</span></span>
     {% include "_tabs.html" %}
     <span class="topright">
-      <a href="/think/chat" style="background:var(--think);color:#fff;padding:7px 16px;border-radius:8px;text-decoration:none;font-weight:700;font-size:0.86rem;margin-right:10px;">💬 새 대화</a>
       <span id="sync-state" class="sync-state">생각 {{ stats.total_pages }} · 결정 {{ stats.active_decisions }}</span>
     </span>
   </div>
@@ -42,9 +41,6 @@
                 {% if p.status == 'paused' %}· paused{% elif p.status == 'archived' %}· archived{% endif %}
               </span>
             </a>
-            <a href="/think/chat/page/{{ p.path|urlencode }}" title="이 페이지와 대화"
-               style="padding:6px 9px;border-radius:6px;text-decoration:none;font-size:1rem;color:var(--think);"
-               onmouseover="this.style.background='#ede9fe'" onmouseout="this.style.background=''">💬</a>
           </div>
         {% endfor %}
       {% endfor %}
