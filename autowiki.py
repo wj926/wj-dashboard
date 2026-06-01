@@ -2,16 +2,21 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 from dataclasses import asdict, dataclass
 from datetime import date
 from pathlib import Path
 from typing import Any, Callable
 
+import fcntl
+import yaml
+
 from thinking_compute import THINKING_ROOT, RAW_ROOT, WIKI_ROOT, build_index
 
 DRAFT_ROOT = THINKING_ROOT / "_autowiki_drafts"
 SEED_CATEGORIES = {"회사", "연구", "제안서", "랩문화", "개인", "시스템"}
+MERGE_LEDGER_PATH = THINKING_ROOT / "_autowiki_drafts" / "merge_ledger.json"
 
 
 @dataclass
@@ -247,3 +252,268 @@ def write_drafts(proposals: list[Proposal]) -> str:
     }
     out_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     return str(out_path)
+
+
+FRONTMATTER_RE = re.compile(r"^---[ \t]*\n(.*?)\n---[ \t]*\n(.*)$", re.DOTALL)
+
+
+def _today() -> str:
+    return date.today().isoformat()
+
+
+def _safe_rel_under(root: Path, rel: str) -> Path:
+    p = (root / rel).resolve()
+    rr = root.resolve()
+    try:
+        p.relative_to(rr)
+    except ValueError as e:
+        raise ValueError(f"path traversal 금지: {rel}") from e
+    return p
+
+
+def _read_frontmatter(md_text: str) -> tuple[dict[str, Any], str]:
+    m = FRONTMATTER_RE.match(md_text)
+    if not m:
+        return {}, md_text
+    fm = yaml.safe_load(m.group(1)) or {}
+    return fm, m.group(2)
+
+
+def _render_frontmatter(fm: dict[str, Any], body: str) -> str:
+    y = yaml.safe_dump(fm, allow_unicode=True, sort_keys=False).strip()
+    return f"---\n{y}\n---\n{body}"
+
+
+def _append_lines_to_section(body: str, heading: str, lines_to_add: list[str]) -> tuple[str, bool]:
+    if not lines_to_add:
+        return body, False
+    raw_lines = body.splitlines()
+    sec_re = re.compile(rf"^##\s+{re.escape(heading)}\s*$")
+    start = -1
+    for i, ln in enumerate(raw_lines):
+        if sec_re.match(ln):
+            start = i
+            break
+    changed = False
+    add = [x for x in lines_to_add if isinstance(x, str) and x.strip()]
+    if not add:
+        return body, False
+    if start == -1:
+        if raw_lines and raw_lines[-1].strip():
+            raw_lines.append("")
+        raw_lines.append(f"## {heading}")
+        raw_lines.extend(add)
+        changed = True
+        return "\n".join(raw_lines) + "\n", changed
+
+    end = len(raw_lines)
+    for j in range(start + 1, len(raw_lines)):
+        if raw_lines[j].startswith("## "):
+            end = j
+            break
+    insert_at = end
+    while insert_at > start + 1 and raw_lines[insert_at - 1].strip() == "":
+        insert_at -= 1
+    new_lines = raw_lines[:insert_at] + add + raw_lines[insert_at:]
+    changed = True
+    return "\n".join(new_lines) + ("\n" if body.endswith("\n") else ""), changed
+
+
+def _load_ledger(ledger_path: Path) -> dict[str, Any]:
+    if not ledger_path.exists():
+        return {"applied_ids": []}
+    try:
+        payload = json.loads(ledger_path.read_text(encoding="utf-8"))
+        if not isinstance(payload, dict):
+            return {"applied_ids": []}
+        if not isinstance(payload.get("applied_ids"), list):
+            payload["applied_ids"] = []
+        return payload
+    except Exception:
+        return {"applied_ids": []}
+
+
+def _save_ledger(ledger_path: Path, payload: dict[str, Any]) -> None:
+    ledger_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = ledger_path.with_suffix(ledger_path.suffix + ".tmp")
+    tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    os.replace(tmp, ledger_path)
+
+
+def _apply_existing_proposal(wiki_root: Path, proposal: dict[str, Any], today: str) -> tuple[bool, str]:
+    rel_path = proposal.get("target", {}).get("rel_path")
+    if not rel_path:
+        return False, "target.rel_path 없음"
+    page = _safe_rel_under(wiki_root, rel_path.replace("wiki/", "", 1) if rel_path.startswith("wiki/") else rel_path)
+    if not page.exists():
+        return False, f"대상 페이지 없음: {page}"
+
+    with open(page, "r+", encoding="utf-8") as f:
+        fcntl.flock(f, fcntl.LOCK_EX)
+        old_text = f.read()
+
+        fm, body = _read_frontmatter(old_text)
+        old_updated = str(fm.get("updated") or "")
+        fm["updated"] = today
+
+        changed = False
+        body2 = body
+
+        tl = proposal.get("proposed", {}).get("timeline_add")
+        body2, c1 = _append_lines_to_section(body2, "타임라인", [tl] if tl else [])
+        changed |= c1
+        body2, c2 = _append_lines_to_section(body2, "열린 질문", proposal.get("proposed", {}).get("open_q_add") or [])
+        changed |= c2
+        body2, c3 = _append_lines_to_section(body2, "결정·방향", proposal.get("proposed", {}).get("decisions_add") or [])
+        changed |= c3
+        body2, c4 = _append_lines_to_section(body2, "할 일", proposal.get("proposed", {}).get("todos_add") or [])
+        changed |= c4
+
+        new_text = _render_frontmatter(fm, body2)
+        if old_text != new_text:
+            changed = True
+        elif old_updated != today:
+            changed = True
+        if not changed:
+            return False, "변경 없음"
+
+        bak = page.with_suffix(page.suffix + ".bak")
+        bak.write_text(old_text, encoding="utf-8")
+        tmp = page.with_suffix(page.suffix + ".tmp")
+        tmp.write_text(new_text, encoding="utf-8")
+        os.replace(tmp, page)
+    return True, "applied(existing)"
+
+
+def _append_category_index(wiki_root: Path, category: str, slug: str, title: str) -> None:
+    idx = _safe_rel_under(wiki_root, f"{category}/_index.md")
+    if not idx.exists():
+        return
+    with open(idx, "r+", encoding="utf-8") as f:
+        fcntl.flock(f, fcntl.LOCK_EX)
+        text = f.read()
+        entry = f"- [[{slug}]] - {title}"
+        if entry in text or f"[[{slug}]]" in text:
+            return
+        new_text = text + ("" if text.endswith("\n") else "\n") + entry + "\n"
+        bak = idx.with_suffix(idx.suffix + ".bak")
+        bak.write_text(text, encoding="utf-8")
+        tmp = idx.with_suffix(idx.suffix + ".tmp")
+        tmp.write_text(new_text, encoding="utf-8")
+        os.replace(tmp, idx)
+
+
+def _apply_new_proposal(wiki_root: Path, proposal: dict[str, Any], today: str) -> tuple[bool, str]:
+    target = proposal.get("target", {})
+    category = target.get("category")
+    slug = target.get("slug")
+    fm_in = proposal.get("proposed", {}).get("new_page_frontmatter") or {}
+    if not category or not slug:
+        return False, "new target category/slug 미확정"
+    cat_dir = _safe_rel_under(wiki_root, category)
+    cat_dir.mkdir(parents=True, exist_ok=True)
+    page = _safe_rel_under(wiki_root, f"{category}/{slug}.md")
+    if page.exists():
+        return False, "이미 존재하는 페이지"
+
+    fm = {
+        "title": fm_in.get("title") or slug,
+        "slug": fm_in.get("slug") or slug,
+        "category_primary": fm_in.get("category_primary") or category,
+        "category_secondary": fm_in.get("category_secondary") or [],
+        "type": fm_in.get("type") or "thought",
+        "status": fm_in.get("status") or "active",
+        "tags": fm_in.get("tags") or [],
+        "created": fm_in.get("created") or today,
+        "updated": today,
+        "links": fm_in.get("links") or [],
+        "aliases": fm_in.get("aliases") or [],
+    }
+    body_lines = [
+        "## 지금 생각",
+        "현재 결론:",
+        "왜 중요:",
+        f"최근 변경: {today} (한 줄)",
+        "",
+        "## 결정·방향",
+        "",
+        "## 할 일",
+        "",
+        "## 열린 질문",
+        "",
+        "## 타임라인",
+    ]
+    body = "\n".join(body_lines) + "\n"
+    tl = proposal.get("proposed", {}).get("timeline_add")
+    body, _ = _append_lines_to_section(body, "타임라인", [tl] if isinstance(tl, str) else [])
+    body, _ = _append_lines_to_section(body, "열린 질문", proposal.get("proposed", {}).get("open_q_add") or [])
+    body, _ = _append_lines_to_section(body, "결정·방향", proposal.get("proposed", {}).get("decisions_add") or [])
+    body, _ = _append_lines_to_section(body, "할 일", proposal.get("proposed", {}).get("todos_add") or [])
+    text = _render_frontmatter(fm, body)
+
+    with open(page, "a+", encoding="utf-8") as f:
+        fcntl.flock(f, fcntl.LOCK_EX)
+        if page.exists() and page.stat().st_size > 0:
+            return False, "경합: 파일 이미 생성됨"
+        tmp = page.with_suffix(page.suffix + ".tmp")
+        tmp.write_text(text, encoding="utf-8")
+        os.replace(tmp, page)
+    _append_category_index(wiki_root, category, slug, fm["title"])
+    return True, "applied(new)"
+
+
+def apply_proposal(proposal: dict[str, Any] | Proposal, wiki_root: Path = WIKI_ROOT, ledger_path: Path = MERGE_LEDGER_PATH) -> dict[str, Any]:
+    p = asdict(proposal) if isinstance(proposal, Proposal) else proposal
+    ingest_id = p.get("ingest_id")
+    if not ingest_id:
+        return {"ok": False, "changed": False, "reason": "ingest_id 없음"}
+
+    if p.get("needs_user_confirm"):
+        return {"ok": False, "changed": False, "reason": "사용자 승인 필요"}
+    kind = p.get("target", {}).get("kind")
+    if kind == "unsure":
+        return {"ok": False, "changed": False, "reason": "target unsure"}
+
+    ledger = _load_ledger(ledger_path)
+    applied = set(ledger.get("applied_ids") or [])
+    if ingest_id in applied:
+        return {"ok": True, "changed": False, "reason": "already applied (ledger)"}
+
+    today = _today()
+    try:
+        if kind == "existing":
+            changed, reason = _apply_existing_proposal(wiki_root, p, today)
+        elif kind == "new":
+            changed, reason = _apply_new_proposal(wiki_root, p, today)
+        else:
+            return {"ok": False, "changed": False, "reason": f"미지원 kind: {kind}"}
+    except Exception as e:
+        return {"ok": False, "changed": False, "reason": f"apply 예외: {e}"}
+
+    if changed:
+        ledger.setdefault("applied_ids", [])
+        ledger["applied_ids"].append(ingest_id)
+        ledger["updated"] = today
+        _save_ledger(ledger_path, ledger)
+        return {"ok": True, "changed": True, "reason": reason}
+    return {"ok": True, "changed": False, "reason": reason}
+
+
+def apply_batch(draft_json_path: str | Path, only_ids: list[str] | None = None, wiki_root: Path = WIKI_ROOT, ledger_path: Path = MERGE_LEDGER_PATH) -> dict[str, Any]:
+    p = Path(draft_json_path)
+    payload = json.loads(p.read_text(encoding="utf-8"))
+    proposals = payload.get("proposals") or []
+    selected = set(only_ids) if only_ids else None
+    results: list[dict[str, Any]] = []
+    for prop in proposals:
+        ingest_id = prop.get("ingest_id")
+        if selected is not None and ingest_id not in selected:
+            continue
+        r = apply_proposal(prop, wiki_root=wiki_root, ledger_path=ledger_path)
+        results.append({"ingest_id": ingest_id, **r})
+    return {
+        "ok": all(x.get("ok") for x in results) if results else True,
+        "count": len(results),
+        "applied": sum(1 for x in results if x.get("changed")),
+        "results": results,
+    }
