@@ -181,6 +181,11 @@
     padding:9px 10px;font-size:0.82rem;color:#1d2329;margin-bottom:12px;font-family:inherit;}
   .persona-sig:focus{outline:none;box-shadow:0 0 0 2px rgba(31,58,102,0.25);}
   .mute-btn{margin-top:8px;width:100%;font-size:0.72rem;}
+  .pri-pick{display:inline-flex;gap:4px;align-items:center;}
+  .pri-opt{cursor:pointer;opacity:0.38;user-select:none;}
+  .pri-opt.on{opacity:1;}
+  .pri-opt:hover{opacity:0.75;}
+  .pri-opt.on:hover{opacity:1;}
   .sent-tag{display:inline-flex;align-items:center;gap:5px;font-size:0.66rem;font-weight:800;color:#fff;
     background:var(--dash);border-radius:6px;padding:3px 9px;}
   .tone-pick{user-select:none;}
@@ -434,7 +439,24 @@
   });
   // 중앙 요약 칩 클릭 시 해당 탭으로 (중앙은 AJAX 로 갈리므로 위임 바인딩)
   document.getElementById('em-focus').addEventListener('click', function(e){
-    var s = e.target.closest('.sjump'); if (s && s.dataset.tab) showPane(s.dataset.tab);
+    var s = e.target.closest('.sjump'); if (s && s.dataset.tab){ showPane(s.dataset.tab); return; }
+    // 우선순위 배지 클릭: 이 메일만 일회성으로 p0/p1/p2 변경
+    var po = e.target.closest('.pri-opt');
+    if (po && !po.classList.contains('on')){
+      var wrap = po.closest('.pri-pick'); var mid = wrap ? wrap.dataset.id : '';
+      var pri = po.dataset.pri;
+      if (!mid || !pri) return;
+      fetch('/api/email/messages/' + mid + '/priority', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({priority: pri})})
+        .then(function(r){ return r.json().catch(function(){ return {ok:false}; }); })
+        .then(function(j){
+          if (j && j.ok){
+            wrap.querySelectorAll('.pri-opt').forEach(function(x){ x.classList.toggle('on', x.dataset.pri === pri); });
+            toast('우선순위를 ' + pri.toUpperCase() + ' 로 바꿨습니다');
+            refreshQueue();  // 큐 배지/정렬 갱신
+          } else { toast('변경 실패'); }
+        })
+        .catch(function(){ toast('변경 실패'); });
+    }
   });
 
   // ---- 레이아웃: 햄버거로 목록/패널 오버레이 토글 (localStorage 기억) ----

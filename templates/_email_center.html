@@ -16,7 +16,9 @@
     <span class="when">{{ focus.time }}</span>
   </div>
   <div class="ef-reasons">
-    <span class="badge {{ focus.priority }}">{{ focus.priority|upper }}</span>
+    <span class="pri-pick" data-id="{{ focus.id }}" title="클릭해서 이 메일 우선순위 바꾸기">
+      {% for p in ['p0', 'p1', 'p2'] %}<span class="badge pri-opt {{ p }}{% if p == focus.priority %} on{% endif %}" data-pri="{{ p }}">{{ p|upper }}</span>{% endfor %}
+    </span>
     {% for r in focus.reasons %}<span class="chip {% if '미회신' in r or '마감' in r %}warn{% endif %}">{{ r }}</span>{% endfor %}
   </div>
   <div class="ef-summary">

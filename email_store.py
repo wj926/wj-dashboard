@@ -100,6 +100,37 @@ def snoozed_ids() -> set:
         return set()
 
 
+# ---- 우선순위 수동 override (이 메일만, 일회성). Gmail 무관, 화면 상태만 ----
+def priority_overrides() -> dict:
+    try:
+        d = _load().get("priority_overrides", {}) or {}
+        return d if isinstance(d, dict) else {}
+    except Exception:
+        return {}
+
+
+def set_priority(message_id: str, priority: str) -> bool:
+    if not message_id or priority not in ("p0", "p1", "p2"):
+        return False
+    d = _load()
+    ov = d.get("priority_overrides")
+    if not isinstance(ov, dict):
+        ov = {}
+    ov[message_id] = priority
+    d["priority_overrides"] = ov
+    return _save(d)
+
+
+def clear_priority(message_id: str) -> bool:
+    d = _load()
+    ov = d.get("priority_overrides")
+    if isinstance(ov, dict) and message_id in ov:
+        del ov[message_id]
+        d["priority_overrides"] = ov
+        return _save(d)
+    return True
+
+
 def snooze(message_id: str, until_ts: int, kind: str = "view") -> bool:
     if not message_id:
         return False

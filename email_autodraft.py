@@ -71,8 +71,10 @@ def select_targets(msgs: list, existing_drafts: dict, limit: int):
     반환: (대상 메일 리스트[<=limit], 상한 초과로 제외된 수)
     """
     import email_score
+    import email_store
 
     muted = set(list_muted())
+    overrides = email_store.priority_overrides()  # 메일별 수동 우선순위(최우선)
     scored = []
     for m in msgs or []:
         mid = m.get("id")
@@ -84,6 +86,8 @@ def select_targets(msgs: list, existing_drafts: dict, limit: int):
         if addr and addr.strip().lower() in muted:
             continue  # 사용자가 '이 발신자 자동초안 끄기' 한 사람
         sf = email_score.score(m)
+        if overrides.get(mid) in ("p0", "p1", "p2"):
+            sf["priority"] = overrides[mid]  # 수동 지정이 자동초안 대상 선별에도 반영
         if sf.get("priority") not in ("p0", "p1"):
             continue
         if "답장 필요" not in (sf.get("reasons") or []):

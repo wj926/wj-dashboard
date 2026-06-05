@@ -223,6 +223,7 @@ def _build_real_view(messages: list[dict], selected_id: str | None,
         snoozed = email_store.snoozed()
         now_ts = int(_time.time())
         rules = email_rules.list_rules()  # 1회 로드, 큐 전체에 재사용
+        overrides = email_store.priority_overrides()  # 메일별 수동 우선순위(최우선)
         later_items = []
         drafts_map = {}
         try:
@@ -254,6 +255,8 @@ def _build_real_view(messages: list[dict], selected_id: str | None,
             s = email_score.score(m)
             if rules:
                 s = email_rules.apply_to(m, s, rules)
+            if overrides.get(mid) in ("p0", "p1", "p2"):
+                s["priority"] = overrides[mid]  # 사용자 수동 지정이 최우선
 
             # 스누즈: 복귀시각 전이고 아직 p0 아니면 메인 큐에서 빼서 '나중에'로.
             sn = snoozed.get(mid)
@@ -312,6 +315,8 @@ def _build_real_view(messages: list[dict], selected_id: str | None,
             sf = email_score.score(m)
             if rules:
                 sf = email_rules.apply_to(m, sf, rules)
+            if overrides.get(target_id) in ("p0", "p1", "p2"):
+                sf["priority"] = overrides[target_id]  # 사용자 수동 지정이 최우선
             focus = {
                 "id": target_id,
                 "sender": _display_name(headers.get("from")),

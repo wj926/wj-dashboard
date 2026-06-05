@@ -469,6 +469,19 @@ def email_draft_discard(mid):
     return jsonify({"ok": True})
 
 
+@app.post("/api/email/messages/<mid>/priority")
+def email_set_priority(mid):
+    """이 메일의 우선순위를 수동 변경(p0/p1/p2). 이 메일만, 일회성. Gmail 무관.
+
+    자동 점수/규칙보다 우선하며, 자동초안 대상 선별도 이 값을 따른다.
+    """
+    import email_store
+    data = request.get_json(silent=True) or {}
+    pri = (data.get("priority") or "").strip().lower()
+    ok = email_store.set_priority(mid, pri)
+    return jsonify({"ok": ok, "priority": pri if ok else None})
+
+
 @app.post("/api/email/messages/<mid>/autodraft/mute")
 def email_autodraft_mute(mid):
     """이 메일 발신자를 자동초안 대상에서 영구 제외 + 현재 초안 폐기.
