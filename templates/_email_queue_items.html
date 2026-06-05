@@ -1,0 +1,21 @@
+{# 처리 큐 항목 목록 (full page + 규칙 변경 후 AJAX 재렌더 공용). queue 를 받는다. #}
+{% for m in queue %}
+<div class="qitem {% if m.current %}on{% endif %}" data-id="{{ m.id }}">
+  <div class="pri-bar pri-{{ m.priority }}"></div>
+  <div class="qmeta">
+    <div class="qtop">
+      <span class="badge {{ m.priority }}">{{ m.priority|upper }}</span>
+      <span class="qsender">{{ m.sender }}</span>
+      <span class="qtime">{{ m.time }}</span>
+      <button class="qx" data-id="{{ m.id }}" title="이 화면에서 숨기기 (Gmail 은 그대로)">×</button>
+    </div>
+    <div class="qsub">{{ m.subject }}</div>
+    <div class="qreasons">
+      {% if m.resurfaced %}<span class="chip resurf">다시 올라옴{% if m.resurfaced_reason %} · {{ m.resurfaced_reason }}{% endif %}</span>{% endif %}
+      {% for r in m.reasons %}<span class="chip {% if '미회신' in r or '마감' in r %}warn{% elif '일정' in r %}ev{% elif '규칙' in r %}rule{% endif %}">{{ r }}</span>{% endfor %}
+      {% if m.has_event %}<span class="qicn" title="일정 후보">📅</span>{% endif %}
+      {% if m.has_draft %}<span class="qicn" title="초안 가능">✎</span>{% endif %}
+    </div>
+  </div>
+</div>
+{% endfor %}

@@ -1,0 +1,16 @@
+{# 말투 프로필 + 서명 (전역 설정. 메일과 무관하게 모든 초안에 적용) #}
+{% set p = persona or {} %}
+<div class="persona-wrap">
+  <p class="dre-msg">여기 적은 말투·원칙이 <b>모든 답장 초안</b>에 자동 반영됩니다. 비우면 기본(정중·간결)으로 씁니다.</p>
+
+  <label class="persona-label">내 말투 / 원칙</label>
+  <textarea id="persona-text" class="persona-edit"
+    placeholder="예: 학생에게는 따뜻하고 격려하는 톤, 외부에는 정중·간결. 거절은 완곡하게 이유를 붙여서. 이모지는 쓰지 않음.">{{ p.persona }}</textarea>
+
+  <label class="persona-label">서명 (초안 마지막 줄)</label>
+  <input id="persona-sig" class="persona-sig" type="text"
+    placeholder="예: 이우진 드림" value="{{ p.signature }}">
+
+  <button class="btn primary" id="persona-save">저장</button>
+  <p class="dre-note">저장은 이 서버에만 보관됩니다. Gmail 과 무관하며, 발송은 항상 승인 시에만 일어납니다.</p>
+</div>

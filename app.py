@@ -8,6 +8,10 @@ POST /api/task/<id>/done        → 완료 표시
 POST /api/task/<id>/undo        → 완료 취소
 POST /api/task/<id>/snooze      → due_at 미루기 (?days=N)
 POST /api/task/<id>/update      → 임의 필드 갱신 (body json)
+POST /api/project               → 프로젝트 생성
+POST /api/project/<id>/update   → 프로젝트 수정
+POST /api/project/<id>/archive  → 프로젝트 보관
+DELETE /api/project/<id>        → 연결 task 없는 프로젝트 삭제
 
 데이터: settings.WJ_DATA_PATH (기본: examples/dashboard.yaml)
 """
@@ -28,6 +32,7 @@ import gcal
 import terminal_pty
 import thinking_compute
 import autowiki
+import email_view
 
 app = Flask(__name__, static_folder="static", template_folder="templates")
 app.config["TEMPLATES_AUTO_RELOAD"] = True
@@ -257,10 +262,23 @@ def index():
     view["projects_json_str"] = json.dumps(view["projects_json"], ensure_ascii=False)
     view["inbox_json_str"] = json.dumps(view["inbox_json"], ensure_ascii=False)
     view["active_tab"] = "work"
-    # 구글 캘린더 읽기 전용 오버레이 (실패해도 빈 값)
+    # 구글 캘린더 읽기 전용 오버레이 + wj 자체 이벤트(승인한 이메일 일정) 합치기 (실패해도 빈 값)
     try:
-        view["gcal_by_day"] = gcal.events_by_day(today, view_year, view_month)
-        view["gcal_agenda"] = gcal.agenda(today)
+        by_day = gcal.events_by_day(today, view_year, view_month)
+        agenda = gcal.agenda(today)
+        try:
+            import wj_events
+            for iso, evs in wj_events.events_by_day(today, view_year, view_month).items():
+                by_day.setdefault(iso, []).extend(evs)
+                by_day[iso].sort(key=lambda e: ((e.get("time") is None), e.get("time") or ""))
+            agenda = sorted(
+                agenda + wj_events.agenda(today),
+                key=lambda e: (e.get("iso") or "", e.get("time") is None, e.get("time") or ""),
+            )[:25]
+        except Exception:
+            pass
+        view["gcal_by_day"] = by_day
+        view["gcal_agenda"] = agenda
     except Exception:
         view["gcal_by_day"] = {}
         view["gcal_agenda"] = []
@@ -280,6 +298,427 @@ def think_index():
     h = thinking_compute.build_hierarchy_data()
     return render_template("think_spotlight.html",
                            today=today, data=data, h=h, active_tab="think")
+
+
+@app.route("/email")
+def email_page():
+    """이메일 탭 (M4 포커스 단일메일).
+
+    email_view.build_email_view 가 WJ_EMAIL_BACKEND(기본 fake) 에 따라 목업/실 Gmail
+    view 를 만든다. 실패/미연동이어도 안전 view(is_mock/needs_auth)로 200 을 렌더한다.
+    발송/등록은 항상 승인 게이트(이 라우트는 읽기 전용).
+    """
+    view = email_view.build_email_view(
+        selected_id=request.args.get("id"),
+        query=request.args.get("q"),
+        allow_fallback=True,  # 읽기 전용 페이지: 오래된 링크면 큐 첫 메일로 매끄럽게
+    )
+    view["active_tab"] = "email"
+    import email_persona
+    view["persona"] = email_persona.load()
+    # 모바일이면 device-width viewport + 세로 스택 레이아웃(데스크톱은 그대로 width=1400).
+    ua = request.headers.get("User-Agent", "")
+    view["is_mobile"] = ("Mobi" in ua) or ("Android" in ua) or ("iPhone" in ua)
+    return render_template("email_focus.html", **view)
+
+
+@app.route("/api/email/center")
+def email_center():
+    """큐 메일 클릭 시 중앙 본문만 부분 렌더(AJAX, 새로고침 없이 교체)."""
+    view = email_view.build_email_view(selected_id=request.args.get("id"), allow_fallback=True)
+    return render_template("_email_center.html", focus=view.get("focus") or {})
+
+
+@app.post("/api/email/messages/<mid>/hide")
+def email_hide(mid):
+    """이 메일을 wj 화면에서만 숨긴다. 실제 Gmail 은 건드리지 않는다."""
+    import email_store
+    email_store.hide(mid)
+    return jsonify({"ok": True})
+
+
+@app.post("/api/email/messages/<mid>/unhide")
+def email_unhide(mid):
+    """숨김 되돌리기(다시 큐에 표시). Gmail 무관."""
+    import email_store
+    email_store.unhide(mid)
+    return jsonify({"ok": True})
+
+
+@app.post("/api/email/messages/<mid>/exclude-sender")
+def email_exclude_sender(mid):
+    """이 발신자를 앞으로 안 보이게(제외목록 추가) + 지금 화면에서도 숨김. Gmail 무변경."""
+    import email_store
+    import email_filters
+    focus = email_view.build_email_view(selected_id=mid).get("focus") or {}
+    sender_email = focus.get("sender_email") or ""
+    if sender_email:
+        email_filters.add_exclude_sender(sender_email)
+    email_store.hide(mid)
+    return jsonify({"ok": True, "sender": sender_email})
+
+
+@app.post("/api/email/messages/<mid>/save-receipt")
+def email_save_receipt(mid):
+    """이 메일을 영수증으로 보관(로컬 스냅샷 + PDF 첨부 파일 저장). Gmail 무변경."""
+    import time as _time
+    import email_store
+    import email_services
+    focus = email_view.build_email_view(selected_id=mid).get("focus") or {}
+    if not focus.get("id"):
+        return jsonify({"ok": False, "error": "not found"}), 404
+
+    # PDF 첨부가 있으면 그 파일을 따로 저장한다(readonly 로 다운로드, Gmail 무변경).
+    files = []
+    try:
+        services = email_services.get_email_services()
+        for a in services.gmail.list_attachments(mid):
+            fn = (a.get("filename") or "")
+            mime = (a.get("mime") or "")
+            if mime == "application/pdf" or fn.lower().endswith(".pdf"):
+                data = services.gmail.download_attachment(mid, a.get("attachment_id"))
+                if data:
+                    rec = email_store.save_receipt_file(mid, fn, data)
+                    if rec:
+                        files.append(rec)
+    except Exception:
+        pass
+
+    email_store.add_receipt({
+        "id": focus.get("id"),
+        "sender": focus.get("sender"),
+        "subject": focus.get("subject"),
+        "time": focus.get("time"),
+        "saved_at": int(_time.time()),
+        "body_html": focus.get("body_html") or "",
+        "files": files,
+    })
+    return jsonify({"ok": True, "pdf_count": len(files)})
+
+
+@app.route("/email/receipts/<rid>/file/<int:idx>")
+def email_receipt_file(rid, idx):
+    """보관한 영수증 첨부(PDF) 다운로드. 저장 레코드의 경로로만 서빙(traversal 방지)."""
+    from flask import send_file, abort
+    import email_store
+    path = email_store.receipt_file_path(rid, idx)
+    if not path or not os.path.exists(path):
+        abort(404)
+    return send_file(path, as_attachment=False, download_name=os.path.basename(path))
+
+
+@app.route("/email/receipts")
+def email_receipts_page():
+    """보관한 영수증함."""
+    import email_store
+    return render_template(
+        "email_receipts.html", receipts=email_store.receipts(), active_tab="email"
+    )
+
+
+@app.post("/api/email/receipts/<rid>/remove")
+def email_receipt_remove(rid):
+    import email_store
+    email_store.remove_receipt(rid)
+    return jsonify({"ok": True})
+
+
+@app.route("/api/email/draft-pane")
+def email_draft_pane():
+    """우측 'AI 초안' 패널 부분 렌더(메일 클릭/초안 생성 후 재렌더용)."""
+    mid = request.args.get("id")
+    view = email_view.build_email_view(selected_id=mid)
+    return render_template(
+        "_email_panel_draft.html",
+        draft=view.get("draft") or {"status": "none"},
+        focus_id=(view.get("focus") or {}).get("id") or mid,
+    )
+
+
+@app.post("/api/email/messages/<mid>/draft/generate")
+def email_draft_generate(mid):
+    """답장 초안 생성(LLM). 발송 아님. Gmail 에 아무것도 안 만든다.
+
+    오직 이 라우트(=버튼 클릭)에서만 LLM 을 호출한다(인박스 로딩은 호출 안 함).
+    결과는 로컬(email_store)에만 'unsent' 로 저장. 발송은 S3b 의 별도 승인 라우트.
+    """
+    import email_store
+    import email_services
+    data = request.get_json(silent=True) or {}
+    tone = (data.get("tone") or "정중·간결").strip()
+    services = email_services.get_email_services()
+    message = services.gmail.get_message(mid)
+    if not message:
+        return jsonify({"ok": False, "error": "메일을 찾을 수 없습니다"}), 404
+    thread_id = message.get("thread_id") or message.get("threadId")
+    thread = services.gmail.get_thread(thread_id) if thread_id else {}
+    res = services.llm.generate_reply_draft(message, thread, tone)
+    if not res.get("ok"):
+        return jsonify({"ok": False, "error": res.get("error") or "초안 생성 실패"}), 502
+    draft = dict(res.get("draft") or {})
+    draft["status"] = "unsent"
+    email_store.save_draft(mid, draft)
+    return jsonify({"ok": True, "draft": draft})
+
+
+@app.post("/api/email/messages/<mid>/draft/discard")
+def email_draft_discard(mid):
+    """생성한 초안 폐기(로컬에서만 삭제). Gmail 무관."""
+    import email_store
+    email_store.clear_draft(mid)
+    return jsonify({"ok": True})
+
+
+@app.post("/api/email/messages/<mid>/autodraft/mute")
+def email_autodraft_mute(mid):
+    """이 메일 발신자를 자동초안 대상에서 영구 제외 + 현재 초안 폐기.
+
+    '이 발신자 안 보기'(큐에서 숨김)와 다르다. 메일은 그대로 보이되, 앞으로
+    자동 초안만 생성하지 않는다. 발송과 무관(아무것도 보내지 않음).
+    """
+    import email_store
+    import email_autodraft
+    import email_services
+    from email.utils import parseaddr
+    services = email_services.get_email_services()
+    message = services.gmail.get_message(mid)
+    addr = ""
+    if message:
+        _, addr = parseaddr((message.get("headers") or {}).get("from") or "")
+    ok = email_autodraft.add_muted(addr) if addr else False
+    email_store.clear_draft(mid)  # 이미 만든 초안도 폐기
+    return jsonify({"ok": ok, "muted": addr})
+
+
+@app.route("/api/email/persona", methods=["GET", "POST"])
+def email_persona_api():
+    """답장 초안용 말투 프로필 + 서명 (전역 설정). 발송과 무관, 저장만 한다."""
+    import email_persona
+    if request.method == "GET":
+        return jsonify({"ok": True, **email_persona.load()})
+    data = request.get_json(silent=True) or {}
+    ok = email_persona.save(data.get("persona") or "", data.get("signature") or "")
+    return jsonify({"ok": ok, **email_persona.load()})
+
+
+@app.route("/api/email/cal-pane")
+def email_cal_pane():
+    """우측 '일정 후보' 패널 부분 렌더(메일 클릭/감지 후 재렌더용)."""
+    mid = request.args.get("id")
+    view = email_view.build_email_view(selected_id=mid)
+    return render_template(
+        "_email_panel_cal.html",
+        candidates=view.get("candidates") or [],
+        focus_id=(view.get("focus") or {}).get("id") or mid,
+    )
+
+
+@app.post("/api/email/messages/<mid>/events/detect")
+def email_events_detect(mid):
+    """메일에서 일정 후보 감지(규칙+LLM). 캘린더엔 쓰지 않는다(S4b 가 등록).
+
+    오직 이 라우트(=버튼 클릭)에서만 LLM 을 호출한다(인박스 로딩은 호출 안 함).
+    후보는 로컬(email_store)에만 'pending' 으로 저장. 등록은 S4b 승인 라우트.
+    """
+    import datetime as _dt
+    from zoneinfo import ZoneInfo
+    import email_store
+    import email_services
+    services = email_services.get_email_services()
+    message = services.gmail.get_message(mid)
+    if not message:
+        return jsonify({"ok": False, "error": "메일을 찾을 수 없습니다"}), 404
+    now_kst = _dt.datetime.now(ZoneInfo("Asia/Seoul"))
+    res = services.llm.detect_events(message, now_kst)
+    if not res.get("ok"):
+        return jsonify({"ok": False, "error": res.get("error") or "일정 감지 실패"}), 502
+    cands = res.get("candidates") or []
+    email_store.save_candidates(mid, cands)
+    return jsonify({"ok": True, "count": len(cands), "candidates": email_store.get_candidates(mid)})
+
+
+@app.post("/api/email/messages/<mid>/events/<cid>/ignore")
+def email_event_ignore(mid, cid):
+    """일정 후보 무시(로컬 상태만). 캘린더 무관. 후보 없으면 404."""
+    import email_store
+    if email_store.set_candidate_status(mid, cid, "ignored"):
+        return jsonify({"ok": True})
+    return jsonify({"ok": False, "error": "후보를 찾을 수 없습니다"}), 404
+
+
+@app.post("/api/email/messages/<mid>/events/<cid>/restore")
+def email_event_restore(mid, cid):
+    """무시한 후보 되살리기(pending). 캘린더 무관. 후보 없으면 404."""
+    import email_store
+    if email_store.set_candidate_status(mid, cid, "pending"):
+        return jsonify({"ok": True})
+    return jsonify({"ok": False, "error": "후보를 찾을 수 없습니다"}), 404
+
+
+def _candidate_event_fields(c, now):
+    """후보 dict -> (iso, 'HH:MM'|None). 날짜를 못 구하면 ('', None)."""
+    import re as _re
+    from datetime import datetime as _dtm, date as _d
+    start = (c.get("start_iso") or "").strip()
+    if start:
+        try:
+            dt = _dtm.fromisoformat(start)
+            tlabel = (c.get("time_label") or "").strip()
+            return dt.date().isoformat(), (tlabel or dt.strftime("%H:%M") or None)
+        except Exception:
+            pass
+    label = (c.get("date_label") or c.get("date") or "")
+    m = _re.search(r"(\d{1,2})\s*/\s*(\d{1,2})", label)
+    if m:
+        try:
+            time_str = (c.get("time_label") or c.get("time") or "").strip()
+            return _d(now.year, int(m.group(1)), int(m.group(2))).isoformat(), (time_str or None)
+        except Exception:
+            pass
+    return "", None
+
+
+@app.post("/api/email/messages/<mid>/events/<cid>/approve")
+def email_event_approve(mid, cid):
+    """일정 후보를 wj 캘린더(로컬, 업무 탭)에 등록. 오직 이 클릭에서만 등록. 중복 차단.
+
+    Google Calendar 아님 -> 추가 권한/재동의 불필요. 같은 후보 두 번 눌러도 한 번만.
+    """
+    import datetime as _dt
+    from zoneinfo import ZoneInfo
+    import email_store
+    import wj_events
+    cand = next((c for c in email_store.get_candidates(mid) if c.get("id") == cid), None)
+    if not cand:
+        return jsonify({"ok": False, "error": "후보를 찾을 수 없습니다"}), 404
+    now = _dt.datetime.now(ZoneInfo("Asia/Seoul"))
+    iso, time_str = _candidate_event_fields(cand, now)
+    if not iso:
+        return jsonify({"ok": False, "error": "날짜를 알 수 없어 캘린더에 넣지 못했습니다"}), 422
+    ref = f"{mid}:{cid}"
+    eid = wj_events.add_event(
+        iso=iso, time_str=time_str, title=cand.get("title") or "일정",
+        source=cand.get("source") or "", ref=ref, origin="email",
+    )
+    if not eid:
+        return jsonify({"ok": False, "error": "캘린더 저장 실패"}), 500
+    email_store.set_candidate_status(mid, cid, "done")
+    return jsonify({"ok": True, "event_id": eid, "iso": iso, "time": time_str})
+
+
+@app.post("/api/email/messages/<mid>/events/<cid>/undo")
+def email_event_undo(mid, cid):
+    """wj 캘린더 등록 되돌리기(로컬에서 이벤트 제거 + 후보 pending). """
+    import email_store
+    import wj_events
+    wj_events.remove_by_ref(f"{mid}:{cid}")
+    email_store.set_candidate_status(mid, cid, "pending")
+    return jsonify({"ok": True})
+
+
+# ---- 처리 규칙(말로 가르치면 똑똑해짐) ----
+@app.route("/api/email/rules-pane")
+def email_rules_pane():
+    """우측 '처리 규칙' 패널 부분 렌더."""
+    import email_rules
+    return render_template("_email_panel_rules.html", rules=email_rules.list_rules())
+
+
+@app.route("/api/email/queue-pane")
+def email_queue_pane():
+    """좌측 큐 항목 부분 렌더(규칙 추가/토글 후 우선순위 즉시 반영용)."""
+    view = email_view.build_email_view(selected_id=request.args.get("id"))
+    return render_template("_email_queue_items.html", queue=view.get("queue") or [])
+
+
+@app.post("/api/email/rules/add")
+def email_rules_add():
+    """자연어 규칙 추가. LLM 으로 매칭/효과 해석 후 저장(규칙 추가 때만 LLM 호출)."""
+    import email_rules
+    import email_services
+    data = request.get_json(silent=True) or {}
+    text = (data.get("text") or "").strip()
+    if not text:
+        return jsonify({"ok": False, "error": "규칙 문장을 입력하세요"}), 400
+    parsed = {}
+    try:
+        services = email_services.get_email_services()
+        parsed = services.llm.parse_rule(text) or {}
+    except Exception:
+        parsed = {}
+    rule = email_rules.add_rule(text, parsed or None)
+    if not rule:
+        return jsonify({"ok": False, "error": "규칙 저장 실패"}), 500
+    return jsonify({"ok": True, "rule": rule})
+
+
+@app.post("/api/email/rules/<rid>/toggle")
+def email_rules_toggle(rid):
+    import email_rules
+    data = request.get_json(silent=True) or {}
+    enabled = bool(data.get("enabled", True))
+    ok = email_rules.set_enabled(rid, enabled)
+    return (jsonify({"ok": True, "enabled": enabled}) if ok
+            else (jsonify({"ok": False, "error": "규칙을 찾을 수 없습니다"}), 404))
+
+
+@app.post("/api/email/rules/<rid>/delete")
+def email_rules_delete(rid):
+    import email_rules
+    ok = email_rules.delete_rule(rid)
+    return (jsonify({"ok": True}) if ok
+            else (jsonify({"ok": False, "error": "규칙을 찾을 수 없습니다"}), 404))
+
+
+# ---- 스누즈(나중에 다시 보기 / 나중에 답변) ----
+def _snooze_until(preset: str, now_kst) -> int:
+    """프리셋 -> 복귀 epoch(sec). KST 기준."""
+    import datetime as _dt
+    if preset == "3h":
+        return int((now_kst + _dt.timedelta(hours=3)).timestamp())
+    if preset == "tomorrow":
+        d = (now_kst + _dt.timedelta(days=1)).replace(hour=9, minute=0, second=0, microsecond=0)
+        return int(d.timestamp())
+    if preset == "nextweek":
+        days = (7 - now_kst.weekday()) or 7  # 다음 주 월요일
+        d = (now_kst + _dt.timedelta(days=days)).replace(hour=9, minute=0, second=0, microsecond=0)
+        return int(d.timestamp())
+    if preset == "urgent":
+        # 멀리(30일) 잡아 시간 도달로는 안 올라오고, p0 될 때만 재부상.
+        return int((now_kst + _dt.timedelta(days=30)).timestamp())
+    # 기본: 3시간
+    return int((now_kst + _dt.timedelta(hours=3)).timestamp())
+
+
+@app.route("/api/email/later-pane")
+def email_later_pane():
+    """좌측 '나중에' 섹션 부분 렌더(스누즈/해제 후 갱신용)."""
+    view = email_view.build_email_view()
+    return render_template("_email_later.html", later=view.get("later") or [])
+
+
+@app.post("/api/email/messages/<mid>/snooze")
+def email_snooze(mid):
+    """이 메일을 '나중에'로 보냄(메인 큐에서 빠지고, 복귀시각/긴급 시 재부상). Gmail 무관."""
+    import datetime as _dt
+    from zoneinfo import ZoneInfo
+    import email_store
+    data = request.get_json(silent=True) or {}
+    preset = (data.get("preset") or "3h").strip()
+    kind = (data.get("kind") or "view").strip()
+    now_kst = _dt.datetime.now(ZoneInfo("Asia/Seoul"))
+    until = _snooze_until(preset, now_kst)
+    ok = email_store.snooze(mid, until, kind)
+    return jsonify({"ok": bool(ok), "until": until})
+
+
+@app.post("/api/email/messages/<mid>/unsnooze")
+def email_unsnooze(mid):
+    """스누즈 해제(지금 큐로 복귀). Gmail 무관. 스누즈 상태 아니면 404."""
+    import email_store
+    if email_store.unsnooze(mid):
+        return jsonify({"ok": True})
+    return jsonify({"ok": False, "error": "스누즈 상태가 아닙니다"}), 404
 
 
 def _list_raw_dates_desc() -> list[str]:
@@ -875,6 +1314,36 @@ def task_update(task_id: str):
     body = request.get_json(silent=True) or {}
     result = compute.update_task(task_id, body)
     code = 200 if result.get("ok") else 404
+    return jsonify(result), code
+
+
+@app.post("/api/project")
+def project_create():
+    body = request.get_json(silent=True) or {}
+    result = compute.create_project(body, date.today())
+    code = 200 if result.get("ok") else 400
+    return jsonify(result), code
+
+
+@app.post("/api/project/<project_id>/update")
+def project_update(project_id: str):
+    body = request.get_json(silent=True) or {}
+    result = compute.update_project(project_id, body)
+    code = 200 if result.get("ok") else (404 if result.get("error") == "project not found" else 400)
+    return jsonify(result), code
+
+
+@app.post("/api/project/<project_id>/archive")
+def project_archive(project_id: str):
+    result = compute.archive_project(project_id)
+    code = 200 if result.get("ok") else 404
+    return jsonify(result), code
+
+
+@app.delete("/api/project/<project_id>")
+def project_delete(project_id: str):
+    result = compute.delete_project(project_id)
+    code = 200 if result.get("ok") else (409 if result.get("linked_count") else 404)
     return jsonify(result), code
 
 

@@ -14,3 +14,13 @@ data/
 .DS_Store
 .idea/
 .vscode/
+
+# 이메일 탭 비밀/토큰/상태/캡처 (절대 commit 금지)
+google_client_secret.json
+client_secret*.json
+google_token.json
+token.json
+email_state.json
+email_cache.json
+email_filters.json
+_shots/

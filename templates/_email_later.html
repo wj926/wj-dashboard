@@ -1,0 +1,16 @@
+{# 나중에(스누즈) 섹션. later 리스트를 받는다. 좌측 큐 하단에 표시. #}
+{% if later %}
+<div class="qdiv"></div>
+<div class="qsec-t">나중에 {{ later|length }}{% set rep = later|selectattr('kind','equalto','reply')|list %}{% if rep %} · 답장할 것 {{ rep|length }}{% endif %}</div>
+{% for l in later %}
+<div class="later-item" data-id="{{ l.id }}">
+  <div class="later-top">
+    <span class="later-kind {{ l.kind }}">{{ '답변' if l.kind == 'reply' else '보기' }}</span>
+    <span class="later-sender">{{ l.sender }}</span>
+    <button class="later-up" data-id="{{ l.id }}" title="지금 처리 큐로 올리기">올리기</button>
+  </div>
+  <div class="later-sub">{{ l.subject }}</div>
+  <div class="later-when">복귀 {{ l.until_label }}{% if l.kind == 'reply' %} · 답장 필요{% endif %} · 급해지면 더 빨리</div>
+</div>
+{% endfor %}
+{% endif %}

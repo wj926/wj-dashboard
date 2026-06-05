@@ -1,0 +1,47 @@
+{# 중앙 포커스 메일 내용 (full page + AJAX 부분교체 공용) #}
+{% if not focus.id %}
+<div class="ef-head">
+  <div class="ef-empty">
+    <p class="ef-empty-title">이 메일은 현재 목록에 없습니다.</p>
+    <p class="ef-empty-sub">오래된 링크이거나, 메일함 갱신 때 목록에서 빠졌을 수 있어요.</p>
+    <p><a class="ef-empty-link" href="/email">인박스로 돌아가기</a></p>
+  </div>
+</div>
+{% else %}
+<div class="ef-head">
+  <h2 class="ef-sub">{{ focus.subject }}</h2>
+  <div class="ef-from">
+    <span class="av">{{ focus.sender[0] if focus.sender else '?' }}</span>
+    <span><b>{{ focus.sender }}</b> <span class="em">&lt;{{ focus.sender_email }}&gt;</span></span>
+    <span class="when">{{ focus.time }}</span>
+  </div>
+  <div class="ef-reasons">
+    <span class="badge {{ focus.priority }}">{{ focus.priority|upper }}</span>
+    {% for r in focus.reasons %}<span class="chip {% if '미회신' in r or '마감' in r %}warn{% endif %}">{{ r }}</span>{% endfor %}
+  </div>
+  <div class="ef-summary">
+    {% if focus.summary and focus.summary.event %}<span class="sjump ev" data-tab="cal">{{ focus.summary.event }}</span>{% endif %}
+    {% if focus.summary and focus.summary.draft %}<span class="sjump dr" data-tab="draft">{{ focus.summary.draft }}</span>{% endif %}
+    {% if focus.summary and focus.summary.followup %}<span class="sjump fu" data-tab="proc">{{ focus.summary.followup }}</span>{% endif %}
+  </div>
+  <div class="ef-actions">
+    <button class="efb" data-act="hide" data-id="{{ focus.id }}" title="실제 Gmail 은 안 지우고 이 화면에서만 숨김">여기서 지우기</button>
+    <button class="snz-toggle" data-id="{{ focus.id }}" title="나중에 다시 보기 / 나중에 답변">나중에</button>
+    <button class="efb" data-act="exclude" data-id="{{ focus.id }}" title="이 발신자 메일을 앞으로 안 띄움">이 발신자 안 보기</button>
+    <button class="efb rc" data-act="receipt" data-id="{{ focus.id }}" title="이 메일을 영수증함에 보관">영수증 저장</button>
+  </div>
+  <div class="snz-opts" id="snz-opts-{{ focus.id }}" data-id="{{ focus.id }}" hidden>
+    <div class="snz-row">
+      <span class="snz-kind on" data-kind="view">나중에 보기</span>
+      <span class="snz-kind" data-kind="reply">나중에 답변</span>
+    </div>
+    <div class="snz-row">
+      <span class="snz-pre" data-preset="3h">3시간 후</span>
+      <span class="snz-pre" data-preset="tomorrow">내일 아침</span>
+      <span class="snz-pre" data-preset="nextweek">다음 주</span>
+      <span class="snz-pre" data-preset="urgent">급해질 때까지</span>
+    </div>
+  </div>
+</div>
+<div class="ef-body">{{ focus.body_html|safe }}</div>
+{% endif %}

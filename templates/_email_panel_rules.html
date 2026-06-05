@@ -1,0 +1,28 @@
+{# 처리 규칙 패널 (full page + AJAX 부분교체 공용). rules 를 받는다. #}
+<div class="rule-add">
+  <div class="rule-add-t">말로 규칙 가르치기</div>
+  <div class="rule-add-row">
+    <input type="text" id="rule-text" class="rule-input" placeholder="예: 두나무에서 오는 메일은 항상 위로" />
+    <button class="btn purple" id="rule-add-btn">추가</button>
+  </div>
+  <p class="dre-note">규칙을 말로 쓰면 다음부터 큐 우선순위에 반영됩니다. 발송·삭제 같은 부작용은 없습니다.</p>
+</div>
+<div id="rule-list">
+  {% for r in rules %}
+  <div class="rule-item" data-id="{{ r.id }}">
+    <div class="rule-top">
+      <span class="rule-toggle {% if r.enabled %}on{% endif %}" data-id="{{ r.id }}" title="켜기/끄기"><span class="rk"></span></span>
+      <span class="rule-name">{{ r.label }}</span>
+      {% if r.needs_review %}<span class="chip warn">검토 필요</span>{% endif %}
+      <button class="rule-del" data-id="{{ r.id }}">삭제</button>
+    </div>
+    <div class="rule-desc">{{ r.text }}</div>
+    <div class="rule-trace">
+      <span class="chip rule">{{ {'priority_up':'위로 올림','priority_down':'낮춤','receipt':'영수증함 후보','later':'나중에'}.get(r.effect, r.effect) }}</span>
+      {% for s in r.match.from %}<span class="chip">보낸이: {{ s }}</span>{% endfor %}
+      {% for s in r.match.subject_kw %}<span class="chip">제목: {{ s }}</span>{% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+  {% if not rules %}<div class="dre-empty"><p class="dre-msg">아직 배운 규칙이 없습니다. 위에 말로 적어 가르쳐 주세요.</p></div>{% endif %}
+</div>

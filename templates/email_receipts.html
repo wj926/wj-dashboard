@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1400">
+<title>wj · 영수증함</title>
+<link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
+<link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}?v=15">
+<style>
+  body{background:var(--bg); --border:#a6b0bc; --muted:#525c66;}
+  .rc-wrap{max-width:980px;margin:0 auto;padding:8px 22px 40px;}
+  .rc-h{color:#fff;font-size:1.2rem;margin:10px 0 4px;}
+  .rc-sub{color:#94a3b8;font-size:0.82rem;margin-bottom:16px;}
+  .rc-empty{background:#fff;border-radius:14px;padding:28px;color:var(--muted);text-align:center;
+    box-shadow:0 6px 22px rgba(0,0,0,0.18);}
+  .rc-card{background:#fff;border-radius:14px;box-shadow:0 6px 22px rgba(0,0,0,0.18);
+    margin-bottom:16px;overflow:hidden;}
+  .rc-head{display:flex;align-items:center;gap:10px;padding:13px 16px;border-bottom:1px solid var(--border);
+    background:#dfe5ed;flex-wrap:wrap;}
+  .rc-head b{color:var(--navy);font-size:0.95rem;}
+  .rc-head .rc-meta{color:var(--muted);font-size:0.76rem;}
+  .rc-head .rc-del{margin-left:auto;font-size:0.72rem;color:var(--p0);background:#fff;
+    border:1px solid var(--border);border-radius:6px;padding:5px 11px;cursor:pointer;}
+  .rc-head .rc-del:hover{border-color:var(--p0);}
+  .rc-files{display:flex;flex-wrap:wrap;gap:8px;padding:12px 16px 0;}
+  .rc-file{display:inline-flex;align-items:center;gap:8px;text-decoration:none;background:#dfe5ed;
+    border:1px solid #8c99a8;border-radius:8px;padding:7px 11px;max-width:100%;}
+  .rc-file:hover{border-color:var(--navy);background:#cfd8e3;}
+  .rc-file-ic{font-size:0.62rem;font-weight:800;color:#fff;background:var(--p0);border-radius:4px;padding:2px 6px;letter-spacing:0.04em;}
+  .rc-file-nm{font-size:0.78rem;color:#243038;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:360px;}
+  .rc-body{padding:18px 20px;font-size:0.92rem;color:#15191f;line-height:1.72;max-width:100%;}
+  .rc-body img{max-width:100%;height:auto;}
+  .rc-body table{max-width:100%;border-collapse:collapse;}
+  .rc-body *{max-width:100%;}
+  /* 본문 대비 보정: 옅은 회색 글자 강제 진하게 */
+  .rc-body *:not(a):not(mark){color:#15191f !important;}
+  .rc-body a, .rc-body a *{color:#16498a !important;text-decoration:underline;}
+  .rc-back{font-size:0.74rem;color:#cbd5e1;text-decoration:none;border:1px solid rgba(255,255,255,0.14);
+    border-radius:6px;padding:4px 9px;margin-left:14px;}
+  .rc-back:hover{background:rgba(255,255,255,0.12);}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <span class="brand">wj<span class="dot">.</span></span>
+    {% include "_tabs.html" %}
+    <a class="rc-back" href="/email">메일로 돌아가기</a>
+    <span class="topright"><span class="sync-state">영수증 {{ receipts|length }}건 보관</span></span>
+  </div>
+
+  <div class="rc-wrap">
+    <h2 class="rc-h">영수증함</h2>
+    <div class="rc-sub">메일에서 "영수증 저장" 을 누른 항목이 여기 보관됩니다. (실제 Gmail 은 그대로입니다)</div>
+
+    {% if not receipts %}
+    <div class="rc-empty">아직 보관한 영수증이 없습니다.<br>메일을 열고 "영수증 저장" 을 누르면 여기에 쌓입니다.</div>
+    {% endif %}
+
+    {% for r in receipts %}
+    <div class="rc-card" data-id="{{ r.id }}">
+      <div class="rc-head">
+        <b>{{ r.subject or '(제목 없음)' }}</b>
+        <span class="rc-meta">{{ r.sender }}{% if r.time %} · {{ r.time }}{% endif %}</span>
+        <button class="rc-del" data-id="{{ r.id }}" title="로컬 보관본만 삭제 (실제 Gmail 무관)">삭제</button>
+      </div>
+      {% if r.files %}
+      <div class="rc-files">
+        {% for f in r.files %}
+        <a class="rc-file" href="/email/receipts/{{ r.id }}/file/{{ loop.index0 }}" target="_blank" rel="noopener">
+          <span class="rc-file-ic">PDF</span><span class="rc-file-nm">{{ f.name }}</span>
+        </a>
+        {% endfor %}
+      </div>
+      {% endif %}
+      <div class="rc-body">{{ r.body_html|safe }}</div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<script>
+  document.querySelectorAll('.rc-del').forEach(function(b){
+    b.addEventListener('click', function(){
+      var id = b.dataset.id;
+      if (!confirm('이 영수증의 로컬 보관본(스냅샷·저장된 PDF)을 삭제할까요? 실제 Gmail 은 그대로입니다.')) return;
+      b.disabled = true;
+      fetch('/api/email/receipts/' + id + '/remove', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'})
+        .then(function(r){ return r.ok ? r.json().catch(function(){ return {ok:false}; }) : {ok:false}; })
+        .then(function(j){
+          if (!j || !j.ok){ alert('삭제 실패'); b.disabled = false; return; }
+          var c = document.querySelector('.rc-card[data-id="' + id + '"]'); if (c) c.remove();
+          var cnt = document.querySelector('.sync-state');
+          var n = document.querySelectorAll('.rc-card').length;
+          if (cnt) cnt.textContent = '영수증 ' + n + '건 보관';
+        })
+        .catch(function(){ alert('삭제 실패'); b.disabled = false; });
+    });
+  });
+</script>
+</body>
+</html>

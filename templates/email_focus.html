@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="{% if is_mobile %}width=device-width, initial-scale=1{% else %}width=1400{% endif %}">
+<title>wj · 메일</title>
+<link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
+<link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}?v=15">
+<style>
+  body{background:var(--bg);overflow:hidden;
+    /* 저채도 파스텔 회피: 보더·muted 를 또렷한 톤으로(모니터가 옅은 색 표현 약함) */
+    --border:#a6b0bc; --muted:#525c66;}
+  /* 이메일 탭은 화면을 꽉 채우되 카드형(둥근 모서리+그림자). wrap 중앙정렬 해제. */
+  .wrap{max-width:none;width:100%;padding:0;margin:0;height:100vh;display:flex;flex-direction:column;}
+  .topbar{padding:9px 16px;margin:0;flex:0 0 auto;}
+  .em-grid{position:relative;display:flex;gap:10px;flex:1 1 auto;min-height:0;padding:14px;overflow:hidden;}
+
+  /* 공통 카드: 둥근 모서리+그림자, 독립 스크롤 */
+  .em-card{background:#fff;min-height:0;overflow-y:auto;overflow-x:hidden;
+    border-radius:14px;box-shadow:0 6px 22px rgba(0,0,0,0.20);}
+
+  /* 좌측 큐: 본문을 가리지 않는 컬럼(겹침 없음). 좌상단 햄버거로 켜고 끔. */
+  .em-queue{flex:0 0 var(--lw,300px);}
+  .em-grid:not(.show-list) .em-queue{display:none;}
+  /* 중앙: 남는 폭을 채우되, 오른쪽 떠있는 패널 자리만큼 padding-right 로 비워 안 겹침. */
+  .em-focus{flex:1 1 auto;min-width:0;}
+  /* 우측 패널: 본문 위에 떠 있는 드로어(그림자). 본문은 자리를 양보해 겹치지 않는다. */
+  .em-panel{position:absolute;right:14px;top:14px;bottom:14px;width:var(--rw,392px);z-index:8;
+    box-shadow:0 12px 44px rgba(0,0,0,0.55);}
+
+  /* 좌상단 햄버거(목록 켜고 끄기) */
+  .em-burger{display:inline-flex;align-items:center;justify-content:center;width:36px;height:31px;
+    margin-right:10px;color:#cbd5e1;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.16);
+    border-radius:8px;cursor:pointer;flex:0 0 auto;}
+  .em-burger svg{width:19px;height:19px;display:block;}
+  .em-burger:hover{background:rgba(255,255,255,0.2);}
+  .em-burger.on{background:#fff;color:var(--navy);border-color:#fff;}
+  .pri-bar{width:4px;border-radius:3px;align-self:stretch;flex:0 0 4px;}
+  .pri-p0{background:var(--p0);} .pri-p1{background:var(--p1);} .pri-p2{background:var(--p2);}
+  .badge{font-size:0.62rem;font-weight:800;letter-spacing:0.04em;padding:1px 6px;border-radius:5px;color:#fff;}
+  .badge.p0{background:var(--p0);} .badge.p1{background:var(--p1);} .badge.p2{background:var(--p2);}
+  .chip{display:inline-block;font-size:0.66rem;color:#3d4b58;background:var(--chip);border-radius:999px;padding:2px 8px;}
+  .chip.warn{background:#fbeced;color:var(--p0);} .chip.ev{background:#e7f1ec;color:var(--dash);}
+  .mockchip{font-size:0.64rem;color:var(--muted);background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.18);
+    border-radius:999px;padding:2px 9px;}
+
+  /* 좌측 큐 */
+  .em-queue{padding:11px 10px;}
+  .em-queue .qhead{display:flex;justify-content:space-between;align-items:baseline;margin:0 2px 8px;}
+  .em-queue .qhead h3{margin:0;font-size:0.7rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);font-weight:800;}
+  .em-queue .prog{font-size:0.66rem;color:var(--muted);}
+  .qitem{display:flex;gap:7px;padding:7px 6px;border-radius:9px;cursor:pointer;border:1px solid transparent;}
+  .qitem:hover{background:#f6f8fb;}
+  .qitem.on{background:#eef3fb;border-color:#d6e2f2;}
+  .qitem .qmeta{min-width:0;flex:1;}
+  .qitem .qtop{display:flex;align-items:center;gap:5px;}
+  .qitem .qsender{font-weight:700;font-size:0.76rem;color:#243038;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .qitem .qtime{margin-left:auto;font-size:0.62rem;color:var(--muted);white-space:nowrap;}
+  .qitem .qx{margin-left:6px;flex:0 0 auto;width:25px;height:25px;line-height:1;border-radius:6px;border:1px solid transparent;
+    background:transparent;color:var(--muted);font-size:1.1rem;cursor:pointer;opacity:0;transition:opacity 0.12s;padding:0;}
+  .qitem:hover .qx{opacity:0.8;}
+  .qitem .qx:hover{opacity:1;background:var(--p0);color:#fff;border-color:var(--p0);}
+  .qitem .qsub{font-size:0.72rem;color:#5b6876;line-height:1.3;margin-top:2px;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+  .qitem .qreasons{margin-top:4px;display:flex;gap:4px;flex-wrap:wrap;}
+  .qicn{font-size:0.6rem;color:var(--muted);}
+  .qdiv{height:1px;background:var(--border);margin:9px 4px;}
+  .qsec-t{font-size:0.64rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);font-weight:800;margin:0 4px 5px;}
+  .qbox{font-size:0.72rem;color:#42505d;padding:5px 6px;border-radius:7px;}
+  .qbox:hover{background:#f6f8fb;}
+  .qbox b{color:#243038;font-weight:700;}
+  .qtools{display:flex;gap:5px;flex-wrap:wrap;margin:2px 4px 0;}
+  .qtool{font-size:0.64rem;color:#42505d;background:#f4f7fb;border:1px solid var(--border);border-radius:6px;padding:3px 8px;cursor:pointer;}
+  .qtool:hover{border-color:var(--navy);color:var(--navy);}
+
+  /* 중앙 포커스. 오른쪽은 떠있는 패널(392) 자리만큼 비워 본문이 패널 밑으로 안 들어가게. */
+  .em-focus{padding:22px 422px 22px 30px;}
+  .ef-head .ef-sub{font-size:1.12rem;color:var(--navy);font-weight:800;margin:0 0 6px;line-height:1.3;}
+  .ef-from{display:flex;align-items:center;gap:9px;font-size:0.8rem;color:#42505d;}
+  .ef-from .av{width:30px;height:30px;border-radius:50%;background:#3d5a80;color:#fff;display:flex;
+    align-items:center;justify-content:center;font-weight:800;font-size:0.8rem;}
+  .ef-from b{color:#243038;} .ef-from .em{color:var(--muted);font-size:0.74rem;}
+  .ef-from .when{margin-left:auto;font-size:0.72rem;color:var(--muted);}
+  .ef-reasons{display:flex;gap:6px;flex-wrap:wrap;margin:9px 0;}
+  .ef-summary{display:flex;gap:8px;flex-wrap:wrap;padding:8px 0;border-top:1px dashed var(--border);
+    border-bottom:1px dashed var(--border);margin:4px 0 14px;}
+  .sjump{font-size:0.7rem;border:1px solid var(--border);background:#fff;border-radius:999px;padding:4px 11px;cursor:pointer;color:#42505d;}
+  .sjump:hover{border-color:var(--navy);color:var(--navy);}
+  .sjump.ev{border-color:#bfe0d0;color:var(--dash);} .sjump.dr{border-color:#d8d0ea;color:var(--think);}
+  .sjump.fu{border-color:#f0c9cd;color:var(--p0);}
+  .ef-body{font-size:0.94rem;color:#15191f;line-height:1.78;max-width:820px;}
+  .ef-body p{margin:0 0 13px;}
+  .ef-body img{max-width:100%;height:auto;}
+  .ef-body table{max-width:100%;border-collapse:collapse;}
+  .ef-body *{max-width:100%;}
+  /* 본문 대비 보정: 메일 HTML 의 옅은 회색 글자색을 강제로 진하게(모니터가 옅은 색을 흰색으로 뭉갬). */
+  .ef-body *:not(a):not(mark){color:#15191f !important;}
+  .ef-body a, .ef-body a *{color:#16498a !important;word-break:break-word;text-decoration:underline;}
+  .ef-body blockquote{border-left:3px solid #8c99a8;padding-left:11px;margin:9px 0;}
+  .quoted-wrap{margin-top:12px;}
+  .quoted-toggle{font-size:0.74rem;color:var(--navy);background:#dde4ec;border:1px solid #8c99a8;
+    border-radius:7px;padding:6px 12px;cursor:pointer;font-weight:700;}
+  .quoted-toggle:hover{border-color:var(--navy);}
+  .ef-body .quoted{margin-top:9px;padding-left:11px;border-left:3px solid #8c99a8;font-size:0.9em;}
+  .ef-body hr{border:none;border-top:1px solid #b6bfca;}
+  .ef-body mark, .ef-body mark *{background:#ffe14d;color:#3a2e00 !important;padding:1px 3px;border-radius:3px;border-bottom:2px solid #b88900;}
+  /* 중앙 액션 버튼 (여기서 지우기 / 발신자 제외 / 영수증 저장) */
+  .ef-actions{display:flex;gap:7px;flex-wrap:wrap;margin:0 0 16px;padding-top:10px;border-top:1px dashed var(--border);}
+  .efb{font-size:0.72rem;color:#42505d;background:#fff;border:1px solid var(--border);border-radius:7px;padding:6px 11px;cursor:pointer;}
+  .efb:hover{border-color:var(--navy);color:var(--navy);}
+  .efb.rc{color:var(--dash);border-color:#bfe0d0;}
+  .efb.rc:hover{background:var(--dash);color:#fff;border-color:var(--dash);}
+  /* 나중에(스누즈) 컨트롤 */
+  .snz-toggle{font-size:0.72rem;color:#42505d;background:#fff;border:1px solid #8c99a8;border-radius:7px;padding:6px 11px;cursor:pointer;}
+  .snz-toggle:hover{border-color:var(--think);color:var(--think);}
+  .snz-opts{margin:0 0 14px;padding:10px 11px;background:#eef1f6;border:1px solid var(--border);border-radius:10px;}
+  .snz-row{display:flex;gap:6px;flex-wrap:wrap;}
+  .snz-row + .snz-row{margin-top:7px;}
+  .snz-kind{font-size:0.72rem;color:#42505d;background:#fff;border:1px solid #8c99a8;border-radius:999px;padding:4px 11px;cursor:pointer;}
+  .snz-kind.on{background:var(--think);color:#fff;border-color:var(--think);}
+  .snz-pre{font-size:0.72rem;color:#243038;background:#fff;border:1px solid #8c99a8;border-radius:7px;padding:6px 10px;cursor:pointer;font-weight:600;}
+  .snz-pre:hover{background:var(--dash);color:#fff;border-color:var(--dash);}
+  /* 좌측 '나중에' 섹션 */
+  .later-item{padding:7px 6px;border-radius:9px;border:1px solid transparent;}
+  .later-item:hover{background:#e7edf5;cursor:pointer;}
+  .later-top{display:flex;align-items:center;gap:6px;}
+  .later-kind{font-size:0.6rem;font-weight:800;border-radius:5px;padding:1px 6px;color:#fff;}
+  .later-kind.view{background:#5b6876;} .later-kind.reply{background:var(--think);}
+  .later-sender{font-weight:700;font-size:0.74rem;color:#243038;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .later-up{margin-left:auto;font-size:0.62rem;color:var(--dash);background:#fff;border:1px solid var(--border);border-radius:6px;padding:2px 7px;cursor:pointer;}
+  .later-up:hover{border-color:var(--dash);}
+  .later-sub{font-size:0.7rem;color:#5b6876;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .later-when{font-size:0.62rem;color:var(--muted);margin-top:3px;}
+  .chip.resurf{background:var(--p0);color:#fff;font-weight:700;}
+  #em-toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:#1f2937;color:#fff;
+    font-size:0.8rem;padding:9px 16px;border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,0.3);
+    opacity:0;transition:opacity 0.2s;pointer-events:none;z-index:50;}
+  #em-toast.show{opacity:1;}
+  .toast-act{margin-left:12px;background:rgba(255,255,255,0.2);color:#fff;border:1px solid rgba(255,255,255,0.4);
+    border-radius:6px;padding:3px 11px;font-size:0.76rem;font-weight:700;cursor:pointer;pointer-events:auto;}
+  .toast-act:hover{background:rgba(255,255,255,0.32);}
+  .topbar .rcpt-link{font-size:0.74rem;color:#cbd5e1;text-decoration:none;border:1px solid rgba(255,255,255,0.14);
+    border-radius:6px;padding:4px 9px;}
+  .topbar .rcpt-link:hover{background:rgba(255,255,255,0.12);}
+
+  /* 우측 패널 */
+  .em-panel{padding:0;}
+  .pt-tabs{display:flex;border-bottom:1px solid var(--border);background:#f4f7fb;position:sticky;top:0;z-index:2;}
+  .pt-tab{flex:1;text-align:center;padding:10px 4px;font-size:0.76rem;font-weight:700;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;}
+  .pt-tab.on{color:var(--navy);background:#fff;border-bottom-color:var(--navy);}
+  .pt-body{padding:13px 14px;}
+  .pt-pane{display:none;} .pt-pane.on{display:block;}
+
+  .unsent-tag{display:inline-flex;align-items:center;gap:5px;font-size:0.66rem;font-weight:800;color:var(--think);
+    background:var(--think-bg);border-radius:6px;padding:3px 9px;}
+  .draft-to{font-size:0.74rem;color:#42505d;margin:9px 0 4px;}
+  .draft-to b{color:#243038;}
+  .tone-row{display:flex;gap:5px;flex-wrap:wrap;margin:6px 0 8px;}
+  .tone{font-size:0.64rem;border:1px solid var(--border);border-radius:999px;padding:3px 9px;color:#42505d;cursor:pointer;}
+  .tone.on{background:var(--think);color:#fff;border-color:var(--think);}
+  .draft-text{background:#faf9fd;border:1px solid #e6e1f1;border-radius:9px;padding:11px 12px;font-size:0.82rem;
+    color:#33323c;line-height:1.6;white-space:pre-wrap;}
+  .btnrow{display:flex;gap:7px;margin-top:11px;flex-wrap:wrap;}
+  .btn{font-size:0.76rem;font-weight:700;border-radius:7px;padding:8px 13px;cursor:pointer;border:1px solid var(--border);background:#fff;color:#42505d;}
+  .btn.primary{background:var(--dash);color:#fff;border-color:var(--dash);}
+  .btn.purple{background:var(--think);color:#fff;border-color:var(--think);}
+  .btn.ghost:hover{border-color:var(--navy);color:var(--navy);}
+  .btn.danger{color:var(--p0);} .btn.danger:hover{border-color:var(--p0);}
+  .btn[disabled]{opacity:0.5;cursor:default;}
+  .draft-edit{width:100%;box-sizing:border-box;min-height:188px;resize:vertical;background:#e8e0f5;border:1px solid #b9a8db;
+    border-radius:9px;padding:11px 12px;font-size:0.82rem;color:#2b2733;line-height:1.6;font-family:inherit;}
+  .draft-edit:focus{outline:none;border-color:var(--think);box-shadow:0 0 0 2px rgba(106,76,196,0.25);}
+  .dre-empty{padding:6px 2px;}
+  .dre-msg{font-size:0.8rem;color:#33323c;margin:4px 0 10px;line-height:1.55;}
+  .dre-note{font-size:0.68rem;color:var(--muted);margin-top:9px;line-height:1.5;}
+  .persona-label{display:block;font-size:0.72rem;font-weight:800;color:var(--navy);margin:12px 0 5px;}
+  .persona-edit{width:100%;box-sizing:border-box;min-height:150px;resize:vertical;background:#fff;
+    border:1.5px solid var(--navy);border-radius:8px;padding:10px;font-size:0.82rem;line-height:1.55;color:#1d2329;font-family:inherit;}
+  .persona-edit:focus{outline:none;box-shadow:0 0 0 2px rgba(31,58,102,0.25);}
+  .persona-sig{width:100%;box-sizing:border-box;background:#fff;border:1.5px solid var(--navy);border-radius:8px;
+    padding:9px 10px;font-size:0.82rem;color:#1d2329;margin-bottom:12px;font-family:inherit;}
+  .persona-sig:focus{outline:none;box-shadow:0 0 0 2px rgba(31,58,102,0.25);}
+  .mute-btn{margin-top:8px;width:100%;font-size:0.72rem;}
+  .sent-tag{display:inline-flex;align-items:center;gap:5px;font-size:0.66rem;font-weight:800;color:#fff;
+    background:var(--dash);border-radius:6px;padding:3px 9px;}
+  .tone-pick{user-select:none;}
+
+  .cand{border:1px solid var(--border);border-radius:10px;padding:10px 11px;margin-bottom:9px;}
+  .cand.done{background:#f3f8f5;border-color:#cfe6da;}
+  .cand.ignored{background:#f7f7f8;opacity:0.85;}
+  .cand .ctop{display:flex;align-items:center;gap:8px;}
+  .cand .cdate{font-weight:800;color:var(--navy);font-size:0.82rem;}
+  .cand .ctime{font-size:0.72rem;color:var(--muted);}
+  .cand .cstate{margin-left:auto;font-size:0.62rem;font-weight:800;padding:2px 8px;border-radius:999px;}
+  .cstate.pending{background:#fcefdc;color:var(--p1);} .cstate.done{background:#e7f1ec;color:var(--dash);}
+  .cstate.ignored{background:#eceef0;color:var(--muted);}
+  .cand .ctitle{font-size:0.82rem;color:#243038;font-weight:700;margin:5px 0 3px;}
+  .cand .csrc{font-size:0.78rem;color:#2b3742;border-left:3px solid #8c99a8;padding-left:8px;margin:5px 0 8px;line-height:1.45;}
+  .cand .cact{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
+  .cdone-note{font-size:0.72rem;color:var(--dash);font-weight:700;}
+
+  .proc-row{display:flex;gap:6px;flex-wrap:wrap;}
+  .proc{font-size:0.72rem;color:#42505d;background:#f4f7fb;border:1px solid var(--border);border-radius:7px;padding:7px 10px;cursor:pointer;}
+  .proc:hover{border-color:var(--navy);color:var(--navy);}
+  .proc.warn{color:var(--p0);} .proc.warn:hover{border-color:var(--p0);}
+
+  /* 처리 규칙 */
+  .rule-add{background:#eef1f6;border:1px solid var(--border);border-radius:11px;padding:11px 12px;margin-bottom:12px;}
+  .rule-add-t{font-size:0.74rem;font-weight:800;color:var(--navy);margin-bottom:7px;}
+  .rule-add-row{display:flex;gap:7px;}
+  .rule-input{flex:1;min-width:0;font-size:0.8rem;color:#243038;background:#fff;border:1px solid #8c99a8;
+    border-radius:8px;padding:8px 10px;font-family:inherit;}
+  .rule-input:focus{outline:none;border-color:var(--think);box-shadow:0 0 0 2px rgba(106,76,196,0.22);}
+  .rule-item{border:1px solid var(--border);border-radius:10px;padding:10px 11px;margin-bottom:9px;background:#fff;}
+  .rule-top{display:flex;align-items:center;gap:8px;}
+  .rule-name{font-size:0.83rem;font-weight:700;color:#243038;}
+  .rule-del{margin-left:auto;font-size:0.68rem;color:var(--p0);background:#fff;border:1px solid var(--border);
+    border-radius:6px;padding:4px 9px;cursor:pointer;}
+  .rule-del:hover{border-color:var(--p0);}
+  .rule-toggle{flex:0 0 auto;width:34px;height:19px;border-radius:999px;background:#b3bcc7;cursor:pointer;
+    position:relative;transition:background 0.15s;}
+  .rule-toggle .rk{position:absolute;top:2px;left:2px;width:15px;height:15px;border-radius:50%;background:#fff;transition:left 0.15s;}
+  .rule-toggle.on{background:var(--dash);}
+  .rule-toggle.on .rk{left:17px;}
+  .rule-desc{font-size:0.76rem;color:#33323c;margin:6px 0 7px;line-height:1.45;}
+  .rule-trace{display:flex;gap:5px;flex-wrap:wrap;}
+  .rule-trace .chip.rule{background:var(--think);color:#fff;}
+
+  /* ===== 저채도 파스텔 회피: 옅은 틴트를 채도 높은 색으로 ===== */
+  .chip{background:#c3cdd9;color:#1d2731;}
+  .chip.warn{background:var(--p0);color:#fff;}
+  .chip.ev{background:var(--dash);color:#fff;}
+  .chip.rule{background:var(--think);color:#fff;}
+  .qitem:hover{background:#d6dfe9;}
+  .qitem.on{background:#b3cbed;border-color:var(--navy);}
+  .qtool{background:#d6dee7;color:#2b3742;}
+  .qbox:hover{background:#d6dee7;}
+  .sjump{border-color:#8c99a8;color:#2b3742;}
+  .sjump.ev{border-color:var(--dash);color:#155c41;}
+  .sjump.dr{border-color:var(--think);color:#4a3b78;}
+  .sjump.fu{border-color:var(--p0);color:var(--p0);}
+  .ef-body mark{background:#ffce3a;color:#3a2e00;border-bottom-color:#b88900;}
+  .efb{border-color:#8c99a8;}
+  .efb.rc{color:#155c41;border-color:var(--dash);}
+  .pt-tab{background:#dde4ec;}
+  .pt-tab.on{background:#fff;}
+  .unsent-tag{background:#d6c9f0;color:#3f2f73;}
+  .draft-text{background:#e8e0f5;border-color:#b9a8db;}
+  .tone{border-color:#8c99a8;}
+  .tone.on{background:var(--think);color:#fff;border-color:var(--think);}
+  .cand{border-color:#8c99a8;}
+  .cstate.pending{background:var(--p1);color:#fff;}
+  .cstate.done{background:var(--dash);color:#fff;}
+  .cstate.ignored{background:#5f6b78;color:#fff;}
+  /* ===== 모바일 (폰): 탭 전환식. 큐 목록 <-> 메일 화면. 데스크톱 영향 없음(viewport 1400). ===== */
+  .m-backbar,.m-seg{display:none;}
+  @media (max-width: 820px){
+    body{overflow:hidden;}
+    .topbar{flex-wrap:wrap;gap:6px 10px;padding:8px 12px;}
+    .topbar .sync-state{font-size:0.62rem;}
+    .em-grid{flex-direction:column;gap:0;padding:0;position:relative;overflow:hidden;box-sizing:border-box;}
+    .em-card,.em-queue,.em-focus,.em-panel{max-width:100%;box-sizing:border-box;}
+    /* 기본(목록 모드): 큐만 전체. 본문/패널/뒤로바 숨김 */
+    .em-queue{flex:1 1 auto;width:auto;max-height:none;border-radius:0;box-shadow:none;overflow-y:auto;}
+    .em-grid:not(.show-list) .em-queue{display:none;}
+    .em-focus, .em-panel{display:none;}
+    /* 메일 모드(.m-detail): 큐 숨기고, 상단 '목록으로'바 + 세그먼트 탭으로 본문/패널을 한 번에 하나만 */
+    .em-grid.m-detail{overflow-y:auto;}
+    .em-grid.m-detail .em-queue{display:none;}
+    .em-grid.m-detail .m-backbar{display:flex;align-items:center;gap:10px;order:1;
+      position:sticky;top:0;z-index:10;background:#10233f;padding:9px 12px;}
+    .em-grid.m-detail .m-seg{display:flex;order:2;position:sticky;top:43px;z-index:9;gap:4px;
+      background:#0f1b2e;padding:6px 8px;overflow-x:auto;}
+    .m-seg-b{flex:0 0 auto;font-size:0.74rem;font-weight:700;color:#cbd5e1;background:rgba(255,255,255,0.08);
+      border:1px solid rgba(255,255,255,0.16);border-radius:999px;padding:5px 12px;cursor:pointer;white-space:nowrap;}
+    .m-seg-b.on{background:#fff;color:var(--navy);border-color:#fff;}
+    .em-grid.m-detail .em-focus{display:none;order:3;position:static;padding:15px 14px;flex:0 0 auto;border-radius:0;box-shadow:none;}
+    .em-grid.m-detail .em-panel{display:none;order:4;position:static;inset:auto;width:auto;border-radius:0;box-shadow:none;}
+    .em-grid.m-detail.m-body .em-focus{display:block;}
+    .em-grid.m-detail:not(.m-body) .em-panel{display:block;}
+    .em-grid.m-detail .pt-tabs{display:none;}   /* 모바일은 상단 세그먼트가 탭 역할 */
+    .m-back{font-size:0.8rem;font-weight:700;color:#fff;background:rgba(255,255,255,0.14);
+      border:1px solid rgba(255,255,255,0.25);border-radius:7px;padding:7px 13px;cursor:pointer;
+      white-space:nowrap;min-width:66px;}
+    .m-back-sub{color:#cbd5e1;font-size:0.74rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .ef-actions,.ef-reasons,.ef-summary{overflow-x:auto;}
+    .ef-body{max-width:100%;overflow-wrap:anywhere;}
+    .ef-body table,.ef-body pre{display:block;overflow-x:auto;}
+    .em-queue .qsub,.em-queue .qbox{overflow-wrap:anywhere;}
+    .ef-head .ef-sub{overflow-wrap:anywhere;}
+    .ef-from{flex-wrap:wrap;}
+    .ef-from .em{word-break:break-all;}
+    .qitem .qx{opacity:0.85;}   /* 모바일은 hover 없으니 X 항상 보이게 */
+    .em-grid.m-detail .em-focus,.em-grid.m-detail .em-panel{overflow-x:hidden;}
+    .draft-edit{min-height:150px;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="topbar">
+    <span class="em-burger" id="tg-left" title="처리 큐 켜기/끄기">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </span>
+    <span class="brand">wj<span class="dot">.</span></span>
+    {% include "_tabs.html" %}
+    <span class="topright" style="display:flex;align-items:center;gap:10px;margin-left:auto;">
+      {% if is_mock %}<span class="mockchip">정적 목업 · Gmail 미연동</span>{% endif %}
+      <span class="sync-state">승인대기 일정 {{ estats.pending_events }} · 초안 {{ estats.pending_drafts }} · 팔로업 {{ estats.followups }}</span>
+      <a class="rcpt-link" href="/email/receipts" title="보관한 영수증함">영수증함</a>
+    </span>
+  </div>
+
+  <div class="em-grid">
+
+    <!-- 모바일 전용: 메일 화면 상단 '목록으로' 바 + 세그먼트 탭 -->
+    <div class="m-backbar">
+      <button class="m-back" id="m-back" type="button">목록</button>
+      <span class="m-back-sub" id="m-back-sub">메일</span>
+    </div>
+    <div class="m-seg" id="m-seg">
+      <span class="m-seg-b on" data-seg="body">본문</span>
+      <span class="m-seg-b" data-seg="draft">AI 초안</span>
+      <span class="m-seg-b" data-seg="cal">일정</span>
+      <span class="m-seg-b" data-seg="proc">팔로업</span>
+      <span class="m-seg-b" data-seg="rules">규칙</span>
+    </div>
+
+    <!-- 좌측 큐 -->
+    <div class="em-card em-queue">
+      <div class="qhead">
+        <h3>처리 큐</h3>
+        <span class="prog">오늘 {{ progress.total }}통 중 {{ progress.idx }}번째</span>
+      </div>
+      <div id="queue-items">{% include "_email_queue_items.html" %}</div>
+
+      <div id="later-section">{% include "_email_later.html" %}</div>
+
+      <div class="qdiv"></div>
+      <div class="qsec-t">임시보관함</div>
+      {% for d in drafts_box %}
+      <div class="qbox">작성중 · <b>{{ d.to }}</b> · {{ d.subject }}</div>
+      {% endfor %}
+
+      <div class="qdiv"></div>
+      <div class="qtools">
+        <span class="qtool">별표</span>
+        <span class="qtool">스누즈함</span>
+        <span class="qtool">아카이브</span>
+        {% for l in labels %}<span class="qtool">{{ l.name }} {{ l.count }}</span>{% endfor %}
+      </div>
+    </div>
+
+    <!-- 중앙 포커스 메일 -->
+    <div class="em-card em-focus" id="em-focus">
+      {% include "_email_center.html" %}
+    </div>
+
+    <!-- 우측 패널 -->
+    <div class="em-card em-panel">
+      <div class="pt-tabs">
+        <div class="pt-tab on" data-pane="draft">AI 초안</div>
+        <div class="pt-tab" data-pane="cal">일정 후보</div>
+        <div class="pt-tab" data-pane="proc">팔로업·처리</div>
+        <div class="pt-tab" data-pane="rules">처리 규칙</div>
+        <div class="pt-tab" data-pane="persona">말투</div>
+      </div>
+      <div class="pt-body">
+
+        <!-- AI 초안 -->
+        <div class="pt-pane on" id="pane-draft">
+          {% set focus_id = focus.id %}
+          {% include "_email_panel_draft.html" %}
+        </div>
+
+        <!-- 일정 후보 -->
+        <div class="pt-pane" id="pane-cal">
+          {% set focus_id = focus.id %}
+          {% include "_email_panel_cal.html" %}
+        </div>
+
+        <!-- 팔로업·처리 -->
+        <div class="pt-pane" id="pane-proc">
+          <div class="dre-msg">이 메일 처리(여기서 지우기 · 나중에 · 발신자 안 보기 · 영수증 저장)는 본문 위 버튼에서 합니다. 모두 이 화면에서만 적용되고 실제 Gmail 은 그대로입니다.</div>
+          <div class="dre-note">별표 · 아카이브 · 라벨 같은 Gmail 직접 조작은 아직 연결하지 않았습니다(읽기 전용). 필요하면 추가합니다.</div>
+        </div>
+
+        <!-- 처리 규칙 -->
+        <div class="pt-pane" id="pane-rules">
+          {% include "_email_panel_rules.html" %}
+        </div>
+
+        <!-- 말투 프로필 -->
+        <div class="pt-pane" id="pane-persona">
+          {% include "_email_panel_persona.html" %}
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+</div>
+<div id="em-toast"></div>
+
+<script>
+  var grid = document.querySelector('.em-grid');
+
+  // 모바일: 큐 목록 <-> 메일 화면 전환
+  var mqMobile = window.matchMedia('(max-width: 820px)');
+  var mBack = document.getElementById('m-back');
+  if (mBack) mBack.addEventListener('click', function(){ grid.classList.remove('m-detail'); grid.scrollTop = 0; });
+  function setSeg(seg){
+    var sb = document.getElementById('m-seg');
+    if (sb) sb.querySelectorAll('.m-seg-b').forEach(function(b){ b.classList.toggle('on', b.dataset.seg === seg); });
+  }
+  var segEl = document.getElementById('m-seg');
+  if (segEl) segEl.addEventListener('click', function(e){
+    var b = e.target.closest('.m-seg-b'); if (!b) return;
+    var seg = b.dataset.seg;
+    setSeg(seg);
+    if (seg === 'body'){ grid.classList.add('m-body'); }
+    else { grid.classList.remove('m-body'); showPane(seg); }
+    grid.scrollTop = 0;
+  });
+
+  // 우측 패널 탭 전환
+  function showPane(name){
+    document.querySelectorAll('.pt-tab').forEach(function(t){ t.classList.toggle('on', t.dataset.pane === name); });
+    document.querySelectorAll('.pt-pane').forEach(function(p){ p.classList.toggle('on', p.id === 'pane-' + name); });
+  }
+  document.querySelectorAll('.pt-tab').forEach(function(t){
+    t.addEventListener('click', function(){ showPane(t.dataset.pane); });
+  });
+  // 중앙 요약 칩 클릭 시 해당 탭으로 (중앙은 AJAX 로 갈리므로 위임 바인딩)
+  document.getElementById('em-focus').addEventListener('click', function(e){
+    var s = e.target.closest('.sjump'); if (s && s.dataset.tab) showPane(s.dataset.tab);
+  });
+
+  // ---- 레이아웃: 햄버거로 목록/패널 오버레이 토글 (localStorage 기억) ----
+  function st(k, d){ var v = localStorage.getItem(k); return v === null ? d : v; }
+  function applyLayout(){
+    var sl = st('em_show_left','1') === '1';
+    grid.classList.add('show-panel');          // 우측 패널은 항상 떠 있는 드로어로 표시
+    grid.classList.toggle('show-list', sl);
+    var bl = document.getElementById('tg-left'); if (bl) bl.classList.toggle('on', sl);
+  }
+  var tgl = document.getElementById('tg-left');
+  if (tgl) tgl.addEventListener('click', function(){ localStorage.setItem('em_show_left', st('em_show_left','1')==='1'?'0':'1'); applyLayout(); });
+  applyLayout();
+  foldQuotes(document);   // 초기 로드 메일의 인용문 접기
+
+  // ---- 메일 클릭 시 중앙만 AJAX 교체 (새로고침 없음) ----
+  var queueEl = document.querySelector('.em-queue');
+  if (queueEl) queueEl.addEventListener('click', function(e){
+    // 나중에 섹션: '올리기'(스누즈 해제) / 항목 클릭 시 메일 열기
+    var up = e.target.closest('.later-up');
+    if (up){
+      e.stopPropagation();
+      var uid = up.getAttribute('data-id');
+      up.disabled = true;
+      fetch('/api/email/messages/' + uid + '/unsnooze', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'})
+        .then(function(r){ return r.json().catch(function(){ return {ok:false}; }); })
+        .then(function(j){
+          if (!j || !j.ok){ toast('올리기 실패'); up.disabled = false; return; }
+          // 올린 메일을 바로 큐에서 이어서 처리하도록 그 메일을 열며 새로고침
+          location.href = '/email?id=' + encodeURIComponent(uid);
+        })
+        .catch(function(){ toast('올리기 실패'); up.disabled = false; });
+      return;
+    }
+    var li = e.target.closest('.later-item');
+    if (li){ var lid = li.getAttribute('data-id'); if (lid) location.href = '/email?id=' + encodeURIComponent(lid); return; }
+    // 빠른 숨김 X (메일 열기보다 먼저 처리, 이벤트 전파 차단)
+    var xbtn = e.target.closest('.qx');
+    if (xbtn){
+      e.stopPropagation();
+      var hid = xbtn.getAttribute('data-id'); if (!hid) return;
+      xbtn.disabled = true;
+      fetch('/api/email/messages/' + hid + '/hide', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'})
+        .then(function(r){ return r.json().catch(function(){ return {ok:false}; }); })
+        .then(function(j){
+          if (!j.ok){ toast('숨기기 실패'); xbtn.disabled = false; return; }
+          var q = xbtn.closest('.qitem'); if (q) q.remove();
+          toast('이 화면에서 숨겼습니다 (Gmail 은 그대로)', '되돌리기', function(){
+            fetch('/api/email/messages/' + hid + '/unhide', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'})
+              .then(function(){ refreshQueue(); });
+          });
+        })
+        .catch(function(){ toast('숨기기 실패'); xbtn.disabled = false; });
+      return;
+    }
+    var item = e.target.closest('.qitem'); if (!item) return;
+    var id = item.getAttribute('data-id'); if (!id) return;
+    document.querySelectorAll('.qitem.on').forEach(function(x){ x.classList.remove('on'); });
+    item.classList.add('on');
+    // '오늘 N통 중 X번째' 즉시 갱신(AJAX 이동이라 서버 prog 와 안 맞던 문제)
+    var allItems = Array.prototype.slice.call(document.querySelectorAll('.qitem'));
+    var ix = allItems.indexOf(item);
+    var progEl = document.querySelector('.prog');
+    if (progEl && ix >= 0) progEl.textContent = '오늘 ' + allItems.length + '통 중 ' + (ix + 1) + '번째';
+    var focusEl = document.getElementById('em-focus');
+    focusEl.style.opacity = '0.5';
+    // draft/cal 패널은 center 와 독립이므로 동시에 발사한다(터널 왕복이 직렬로 누적되던 딜레이 제거)
+    refreshDraftPane(id);
+    refreshCalPane(id);
+    fetch('/api/email/center?id=' + encodeURIComponent(id))
+      .then(function(r){ return r.text(); })
+      .then(function(html){
+        focusEl.innerHTML = html;
+        focusEl.style.opacity = '1';
+        focusEl.scrollTop = 0;
+        history.replaceState(null, '', '/email?id=' + encodeURIComponent(id));
+        foldQuotes(focusEl);
+        if (mqMobile.matches){
+          grid.classList.add('m-detail'); grid.classList.add('m-body'); setSeg('body'); grid.scrollTop = 0;
+          var sub = document.getElementById('m-back-sub');
+          var t = item.querySelector('.qsub');
+          if (sub) sub.textContent = t ? t.textContent.slice(0, 40) : '메일';
+        }
+      })
+      .catch(function(){ location.href = '/email?id=' + encodeURIComponent(id); });
+  });
+
+  // ---- 토스트 ----
+  function toast(msg, actLabel, actFn){
+    var t = document.getElementById('em-toast');
+    if (!t) return;
+    t.textContent = msg;
+    if (actLabel && actFn){
+      var a = document.createElement('button');
+      a.className = 'toast-act'; a.type = 'button'; a.textContent = actLabel;
+      a.addEventListener('click', function(){ try { actFn(); } catch(e){} t.classList.remove('show'); });
+      t.appendChild(a);
+    }
+    t.classList.add('show');
+    clearTimeout(t._tm); t._tm = setTimeout(function(){ t.classList.remove('show'); }, (actLabel && actFn) ? 5000 : 2600);
+  }
+
+  // ---- 중앙 액션: 여기서 지우기 / 발신자 제외 / 영수증 저장 ----
+  function openNextMail(curId){
+    var items = Array.prototype.slice.call(document.querySelectorAll('.qitem'));
+    if (!items.length) return;
+    var idx = -1;
+    for (var i=0;i<items.length;i++){ if (items[i].getAttribute('data-id')===curId){ idx=i; break; } }
+    var nxt = items[idx+1] || items[0];
+    if (nxt && nxt.getAttribute('data-id')!==curId) nxt.click();
+  }
+  // 나중에(스누즈) 옵션 토글/선택/실행
+  function refreshLaterPane(){
+    var sec = document.getElementById('later-section'); if (!sec) return;
+    fetch('/api/email/later-pane').then(function(r){ return r.text(); })
+      .then(function(html){ sec.innerHTML = html; }).catch(function(){});
+  }
+  function snoozeMail(id, preset, kind){
+    fetch('/api/email/messages/' + id + '/snooze', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({preset:preset, kind:kind})})
+      .then(function(r){ return r.json().catch(function(){ return {ok:false}; }); })
+      .then(function(j){
+        if (!j.ok){ toast('나중에 보내기 실패'); return; }
+        toast((kind === 'reply' ? '나중에 답변' : '나중에 보기') + '으로 옮겼습니다 (급해지면 다시 올라옴)');
+        var q = document.querySelector('.qitem[data-id="' + id + '"]'); if (q) q.remove();
+        refreshLaterPane();
+        openNextMail(id);
+      })
+      .catch(function(){ toast('나중에 보내기 실패'); });
+  }
+  // 인용문 펼치기/접기 (텍스트 본문 분리 + blockquote)
+  function foldQuotes(root){
+    // 1) blockquote(Gmail 웹 답장) 접기
+    (root || document).querySelectorAll('.ef-body blockquote').forEach(function(bq){
+      if (bq.dataset.f || bq.closest('.quoted')) return;
+      if ((bq.textContent || '').trim().length < 120) return;
+      bq.dataset.f = '1';
+      var wrap = document.createElement('div'); wrap.className = 'quoted'; wrap.setAttribute('hidden', '');
+      var btn = document.createElement('button'); btn.type = 'button'; btn.className = 'quoted-toggle'; btn.textContent = '인용문 펼치기';
+      bq.parentNode.insertBefore(btn, bq);
+      bq.parentNode.insertBefore(wrap, bq);
+      wrap.appendChild(bq);
+    });
+    // 2) HTML 본문의 'Original Message'/'작성:'/'보냄:' 마커부터 이후를 접기(블록 요소로 나뉜 경우)
+    var body = (root || document).querySelector('.ef-body');
+    if (!body || body.dataset.qf) return;
+    var head = /-{2,}\s*Original Message|원본 메일/i, tail = /(wrote:|작성|보냄)\s*[:：]?\s*$/i;
+    var kids = Array.prototype.slice.call(body.children), idx = -1;
+    for (var i = 0; i < kids.length; i++){
+      var tx = (kids[i].textContent || '').trim();
+      if (kids[i].classList.contains('quoted') || kids[i].classList.contains('quoted-toggle')) continue;
+      if (head.test(tx) || (tail.test(tx) && tx.length < 90)){ idx = i; break; }
+    }
+    if (idx < 1) return;   // 맨 앞이면 전체가 인용일 수 있어 접지 않음
+    body.dataset.qf = '1';
+    var w2 = document.createElement('div'); w2.className = 'quoted'; w2.setAttribute('hidden', '');
+    var b2 = document.createElement('button'); b2.type = 'button'; b2.className = 'quoted-toggle'; b2.textContent = '이전 대화 펼치기';
+    body.insertBefore(b2, kids[idx]);
+    body.insertBefore(w2, kids[idx]);
+    for (var j = idx; j < kids.length; j++){ w2.appendChild(kids[j]); }
+  }
+  document.getElementById('em-focus').addEventListener('click', function(e){
+    var qt = e.target.closest('.quoted-toggle');
+    if (qt){
+      var w = qt.nextElementSibling;
+      if (w && w.classList.contains('quoted')){
+        if (w.hasAttribute('hidden')){ w.removeAttribute('hidden'); qt.textContent = qt.textContent.replace('펼치기','접기'); }
+        else { w.setAttribute('hidden',''); qt.textContent = qt.textContent.replace('접기','펼치기'); }
+      }
+      return;
+    }
+    var snzT = e.target.closest('.snz-toggle');
+    if (snzT){ var op = document.getElementById('snz-opts-' + snzT.dataset.id); if (op) op.hidden = !op.hidden; return; }
+    var snzK = e.target.closest('.snz-kind');
+    if (snzK){ var box = snzK.closest('.snz-opts'); box.querySelectorAll('.snz-kind').forEach(function(x){ x.classList.remove('on'); }); snzK.classList.add('on'); return; }
+    var snzP = e.target.closest('.snz-pre');
+    if (snzP){ var bx = snzP.closest('.snz-opts'); var ke = bx.querySelector('.snz-kind.on'); snoozeMail(bx.dataset.id, snzP.dataset.preset, ke ? ke.dataset.kind : 'view'); return; }
+    var b = e.target.closest('.efb'); if (!b) return;
+    var act = b.dataset.act, id = b.dataset.id; if (!id) return;
+    b.disabled = true;
+    var url = act === 'hide' ? '/api/email/messages/' + id + '/hide'
+            : act === 'exclude' ? '/api/email/messages/' + id + '/exclude-sender'
+            : '/api/email/messages/' + id + '/save-receipt';
+    fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'})
+      .then(function(r){ return r.json().catch(function(){ return {ok:false}; }); })
+      .then(function(j){
+        if (act === 'receipt'){ toast(j.ok ? ('영수증함에 저장했습니다' + (j.pdf_count ? (' · PDF ' + j.pdf_count + '개') : '')) : '저장 실패'); b.disabled = false; return; }
+        toast(act === 'hide' ? '이 화면에서 숨겼습니다 (Gmail 은 그대로)' : '이 발신자를 앞으로 안 보입니다');
+        var q = document.querySelector('.qitem[data-id="' + id + '"]');
+        if (q) q.remove();
+        openNextMail(id);
+      })
+      .catch(function(){ toast('처리 실패'); b.disabled = false; });
+  });
+
+  // ---- AI 초안: 생성 / 다시 생성 / 폐기 (발송은 S3b 에서 연결) ----
+  var paneDraft = document.getElementById('pane-draft');
+  function refreshDraftPane(id){
+    if (!paneDraft || !id) return;
+    fetch('/api/email/draft-pane?id=' + encodeURIComponent(id))
+      .then(function(r){ return r.text(); })
+      .then(function(html){ paneDraft.innerHTML = html; })
+      .catch(function(){});
+  }
+  function pickedTone(){
+    var on = paneDraft && paneDraft.querySelector('.tone-pick.on');
+    return on ? on.dataset.tone : '정중·간결';
+  }
+  function genDraft(id, tone, btn){
+    if (!id) return;
+    if (btn){ btn.disabled = true; btn.textContent = '생성 중...'; }
+    toast('초안 생성 중입니다 (바로 보내지 않습니다)');
+    fetch('/api/email/messages/' + id + '/draft/generate', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({tone: tone || '정중·간결'})
+    })
+      .then(function(r){ return r.json().catch(function(){ return {ok:false}; }); })
+      .then(function(j){
+        if (!j.ok){ toast('초안 생성 실패: ' + (j.error || '')); if (btn){ btn.disabled=false; } return; }
+        toast('미발송 초안을 만들었습니다. 발송은 승인 시에만.');
+        refreshDraftPane(id);
+        var q = document.querySelector('.qitem[data-id="' + id + '"]'); // 큐에 초안 표시
+        if (q && !q.querySelector('.qicn-draft')){
+          var s = document.createElement('span'); s.className='qicn qicn-draft'; s.title='초안 있음'; s.textContent='✎';
+          q.appendChild(s);
+        }
+      })
+      .catch(function(){ toast('초안 생성 실패'); if (btn){ btn.disabled=false; } });
+  }
+  if (paneDraft) paneDraft.addEventListener('click', function(e){
+    var tp = e.target.closest('.tone-pick');
+    if (tp){
+      paneDraft.querySelectorAll('.tone-pick').forEach(function(x){ x.classList.remove('on'); });
+      tp.classList.add('on'); return;
+    }
+    var gen = e.target.closest('#draft-gen');
+    if (gen){ genDraft(gen.dataset.id, pickedTone(), gen); return; }
+    var regen = e.target.closest('#draft-regen');
+    if (regen){ genDraft(regen.dataset.id, regen.dataset.tone || '정중·간결', regen); return; }
+    var disc = e.target.closest('#draft-discard');
+    if (disc){
+      var id = disc.dataset.id; disc.disabled = true;
+      fetch('/api/email/messages/' + id + '/draft/discard', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'})
+        .then(function(r){ return r.json().catch(function(){ return {ok:false}; }); })
+        .then(function(){ toast('초안을 폐기했습니다'); refreshDraftPane(id);
+          var q = document.querySelector('.qitem[data-id="' + id + '"] .qicn-draft'); if (q) q.remove(); })
+        .catch(function(){ toast('폐기 실패'); disc.disabled = false; });
+      return;
+    }
+    var send = e.target.closest('#draft-send');
+    if (send){ toast('발송 연결은 다음 단계입니다 (Google 재동의 후). 지금은 보내지 않습니다.'); return; }
+    var mute = e.target.closest('#draft-mute');
+    if (mute){
+      var mid = mute.dataset.id; mute.disabled = true;
+      fetch('/api/email/messages/' + mid + '/autodraft/mute', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'})
+        .then(function(r){ return r.json().catch(function(){ return {ok:false}; }); })
+        .then(function(j){
+          toast((j && j.ok) ? '이 발신자는 앞으로 자동초안을 만들지 않습니다 (초안 폐기됨)' : '설정 실패');
+          refreshDraftPane(mid);
+          var q = document.querySelector('.qitem[data-id="' + mid + '"] .qicn-draft'); if (q) q.remove();
+        })
+        .catch(function(){ mute.disabled = false; toast('설정 실패'); });
+      return;
+    }
+  });
+
+  // ---- 일정 후보: 감지 / 무시 / 되살리기 (캘린더 등록은 S4b 에서 연결) ----
+  var paneCal = document.getElementById('pane-cal');
+  function refreshCalPane(id){
+    if (!paneCal || !id) return;
+    fetch('/api/email/cal-pane?id=' + encodeURIComponent(id))
+      .then(function(r){ return r.text(); })
+      .then(function(html){ paneCal.innerHTML = html; })
+      .catch(function(){});
+  }
+  function detectEvents(id, btn){
+    if (!id) return;
+    if (btn){ btn.disabled = true; btn.textContent = '감지 중...'; }
+    toast('일정 후보를 찾는 중입니다 (캘린더엔 등록 안 함)');
+    fetch('/api/email/messages/' + id + '/events/detect', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'})
+      .then(function(r){ return r.json().catch(function(){ return {ok:false}; }); })
+      .then(function(j){
+        if (!j.ok){ toast('일정 감지 실패: ' + (j.error || '')); if (btn){ btn.disabled=false; } return; }
+        toast(j.count ? (j.count + '개 후보를 찾았습니다 (승인 전엔 등록 안 됨)') : '이 메일에선 일정 후보를 못 찾았습니다');
+        refreshCalPane(id);
+        var q = document.querySelector('.qitem[data-id="' + id + '"]');
+        if (j.count && q && !q.querySelector('.qicn-cal')){
+          var s = document.createElement('span'); s.className='qicn qicn-cal'; s.title='일정 후보'; s.textContent='📅';
+          q.querySelector('.qreasons') ? q.querySelector('.qreasons').appendChild(s) : q.appendChild(s);
+        }
+      })
+      .catch(function(){ toast('일정 감지 실패'); if (btn){ btn.disabled=false; } });
+  }
+  function calStatus(id, cid, act){
+    fetch('/api/email/messages/' + id + '/events/' + cid + '/' + act, {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'})
+      .then(function(r){ return r.json().catch(function(){ return {ok:false}; }); })
+      .then(function(j){
+        if (!j || !j.ok){ toast('처리 실패: ' + ((j && j.error) || '')); return; }
+        toast(act === 'ignore' ? '후보를 무시했습니다' : '후보를 되살렸습니다');
+        refreshCalPane(id);
+      })
+      .catch(function(){ toast('처리 실패'); });
+  }
+  function approveEvent(id, cid, btn){
+    if (btn){ btn.disabled = true; btn.textContent = '추가 중...'; }
+    fetch('/api/email/messages/' + id + '/events/' + cid + '/approve', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'})
+      .then(function(r){ return r.json().catch(function(){ return {ok:false}; }); })
+      .then(function(j){
+        if (!j || !j.ok){ toast('캘린더 추가 실패: ' + ((j && j.error) || '')); if (btn){ btn.disabled=false; btn.textContent='캘린더에 추가'; } return; }
+        toast('wj 캘린더에 추가했습니다' + (j.iso ? (' · ' + j.iso + (j.time ? (' ' + j.time) : '')) : ''),
+              '업무 탭에서 보기', function(){ location.href = '/' + (j.iso ? ('?ym=' + j.iso.slice(0,7)) : ''); });
+        refreshCalPane(id);
+      })
+      .catch(function(){ toast('캘린더 추가 실패'); if (btn){ btn.disabled=false; btn.textContent='캘린더에 추가'; } });
+  }
+  function undoEvent(id, cid){
+    fetch('/api/email/messages/' + id + '/events/' + cid + '/undo', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'})
+      .then(function(r){ return r.json().catch(function(){ return {ok:false}; }); })
+      .then(function(j){ toast((j && j.ok) ? 'wj 캘린더에서 되돌렸습니다' : '되돌리기 실패'); refreshCalPane(id); })
+      .catch(function(){ toast('되돌리기 실패'); });
+  }
+  if (paneCal) paneCal.addEventListener('click', function(e){
+    var det = e.target.closest('.cal-detect'); if (det){ detectEvents(det.dataset.id, det); return; }
+    var add = e.target.closest('.cal-add'); if (add){ approveEvent(add.dataset.id, add.dataset.cid, add); return; }
+    var undo = e.target.closest('.cal-undo'); if (undo){ undoEvent(undo.dataset.id, undo.dataset.cid); return; }
+    var ig = e.target.closest('.cal-ignore'); if (ig){ calStatus(ig.dataset.id, ig.dataset.cid, 'ignore'); return; }
+    var rs = e.target.closest('.cal-restore'); if (rs){ calStatus(rs.dataset.id, rs.dataset.cid, 'restore'); return; }
+  });
+
+  // ---- 말투 프로필: 저장(전역 설정, 다음 초안부터 반영) ----
+  var pSaveBtn = document.getElementById('persona-save');
+  if (pSaveBtn) pSaveBtn.addEventListener('click', function(){
+    var ta = document.getElementById('persona-text');
+    var sg = document.getElementById('persona-sig');
+    pSaveBtn.disabled = true;
+    fetch('/api/email/persona', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({persona: ta ? ta.value : '', signature: sg ? sg.value : ''})})
+      .then(function(r){ return r.json().catch(function(){ return {ok:false}; }); })
+      .then(function(j){ pSaveBtn.disabled = false;
+        toast((j && j.ok) ? '말투 프로필을 저장했습니다 (다음 초안부터 반영)' : '저장 실패'); })
+      .catch(function(){ pSaveBtn.disabled = false; toast('저장 실패'); });
+  });
+
+  // ---- 처리 규칙: 추가(LLM 해석) / 켜고끄기 / 삭제 ----
+  var paneRules = document.getElementById('pane-rules');
+  function refreshRulesPane(){
+    if (!paneRules) return;
+    fetch('/api/email/rules-pane').then(function(r){ return r.text(); })
+      .then(function(html){ paneRules.innerHTML = html; }).catch(function(){});
+  }
+  function currentMailId(){
+    var m = location.search.match(/[?&]id=([^&]+)/);
+    return m ? decodeURIComponent(m[1]) : '';
+  }
+  function refreshQueue(){
+    var qi = document.getElementById('queue-items'); if (!qi) return;
+    var id = currentMailId();
+    fetch('/api/email/queue-pane' + (id ? ('?id=' + encodeURIComponent(id)) : ''))
+      .then(function(r){ return r.text(); })
+      .then(function(html){ qi.innerHTML = html; }).catch(function(){});
+  }
+  function addRule(){
+    var inp = document.getElementById('rule-text'); if (!inp) return;
+    var text = (inp.value || '').trim();
+    if (!text){ toast('규칙을 말로 적어주세요'); return; }
+    var btn = document.getElementById('rule-add-btn');
+    if (btn){ btn.disabled = true; btn.textContent = '해석 중...'; }
+    fetch('/api/email/rules/add', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({text: text})})
+      .then(function(r){ return r.json().catch(function(){ return {ok:false}; }); })
+      .then(function(j){
+        if (!j.ok){ toast('규칙 추가 실패: ' + (j.error||'')); if (btn){ btn.disabled=false; btn.textContent='추가'; } return; }
+        toast('처리 규칙을 추가했습니다 · 큐에 바로 반영');
+        refreshRulesPane(); refreshQueue();
+      })
+      .catch(function(){ toast('규칙 추가 실패'); if (btn){ btn.disabled=false; btn.textContent='추가'; } });
+  }
+  if (paneRules) paneRules.addEventListener('click', function(e){
+    var add = e.target.closest('#rule-add-btn'); if (add){ addRule(); return; }
+    var tg = e.target.closest('.rule-toggle');
+    if (tg){
+      var on = !tg.classList.contains('on');
+      fetch('/api/email/rules/' + tg.dataset.id + '/toggle', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({enabled: on})})
+        .then(function(r){ return r.json().catch(function(){ return {ok:false}; }); })
+        .then(function(j){ if (j.ok){ tg.classList.toggle('on', on); toast(on?'규칙을 켰습니다':'규칙을 껐습니다'); refreshQueue(); } else { toast('변경 실패'); } })
+        .catch(function(){ toast('변경 실패'); });
+      return;
+    }
+    var del = e.target.closest('.rule-del');
+    if (del){
+      fetch('/api/email/rules/' + del.dataset.id + '/delete', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'})
+        .then(function(r){ return r.json().catch(function(){ return {ok:false}; }); })
+        .then(function(j){ if (j.ok){ var it=del.closest('.rule-item'); if(it) it.remove(); toast('규칙을 삭제했습니다'); refreshQueue(); } else { toast('삭제 실패'); } })
+        .catch(function(){ toast('삭제 실패'); });
+      return;
+    }
+  });
+  if (paneRules) paneRules.addEventListener('keydown', function(e){
+    if (e.key === 'Enter' && e.target.id === 'rule-text'){ e.preventDefault(); addRule(); }
+  });
+</script>
+</body>
+</html>
