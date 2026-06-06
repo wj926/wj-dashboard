@@ -10,10 +10,10 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='thinking.css') }}?v=31">
 <script src="https://d3js.org/d3.v7.min.js"></script>
 <style>
-  body { background:#f1f4f8; }
+  /* 배경은 공통 다크(#0f172a) 사용 — 업무·메일 탭과 톤 통일. 카드는 흰색 유지 */
   .ts-hero { max-width:1400px; margin:14px auto 6px; padding:0 24px; display:flex; align-items:center; gap:14px; }
-  .ts-hero h2 { margin:0; color:var(--navy); font-size:1.4rem; }
-  .ts-hero .sub { color:var(--muted); font-size:0.84rem; }
+  .ts-hero h2 { margin:0; color:#fff; font-size:1.4rem; }
+  .ts-hero .sub { color:#cbd5e1; font-size:0.84rem; }
   .ts-hero .actions { margin-left:auto; display:flex; gap:8px; }
   .ts-hero .actions a {
     background:var(--think); color:#fff; padding:8px 14px; border-radius:8px;
@@ -51,7 +51,7 @@
   }
 </style>
 </head>
-<body>
+<body class="dark">
 <div class="wrap">
 
   <div class="topbar">

@@ -1,7 +1,9 @@
 /* ===== thinking — 생각 영역 ===== */
 
-.wrap.think-wrap { background: #f8fafc; min-height: 100vh; }
-body:has(.think-wrap) { background: #f8fafc; }
+/* 다크 통일(업무·메일 탭과 톤 맞춤). 카드는 흰색 유지, 배경 위 글씨만 밝게 */
+.wrap.think-wrap { background: #0e1626; min-height: 100vh; }
+body:has(.think-wrap) { background: #0e1626; }
+body.dark { background: #0e1626; color: #e2e8f0; }
 
 /* 상단 탭 (work/think 공통) */
 .top-tabs { display: flex; gap: 4px; margin-left: 20px; }
