@@ -1409,5 +1409,43 @@ def project_delete(project_id: str):
     return jsonify(result), code
 
 
+# ===== 이슈 트래커 (앱 관련 버그·할 일을 적어두고 댓글로 닫는다) =====
+@app.route("/issues")
+def issues_page():
+    import issues
+    return render_template("issues.html", active_tab="issues", issues=issues.list_issues())
+
+
+@app.route("/api/issues/list")
+def issues_list():
+    import issues
+    return render_template("_issues_list.html", issues=issues.list_issues())
+
+
+@app.post("/api/issues")
+def issues_create():
+    import issues
+    data = request.get_json(silent=True) or {}
+    iss = issues.add(data.get("title"), data.get("body"), data.get("author"), data.get("images"))
+    return jsonify({"ok": bool(iss), "id": iss.get("id")})
+
+
+@app.post("/api/issues/<iid>/comment")
+def issues_comment(iid: str):
+    import issues
+    data = request.get_json(silent=True) or {}
+    ok = issues.add_comment(iid, data.get("author"), data.get("body"),
+                            data.get("images"), bool(data.get("close")))
+    return jsonify({"ok": ok})
+
+
+@app.post("/api/issues/<iid>/status")
+def issues_status(iid: str):
+    import issues
+    data = request.get_json(silent=True) or {}
+    ok = issues.set_status(iid, data.get("status"))
+    return jsonify({"ok": ok})
+
+
 if __name__ == "__main__":
     app.run(host=SETTINGS.host, port=SETTINGS.port, debug=False)

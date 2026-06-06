@@ -1,0 +1,37 @@
+{# 이슈 카드 목록 (full page + AJAX 부분교체 공용). issues 를 받는다. #}
+{% for it in issues %}
+<div class="iss-card {{ it.status }}" data-id="{{ it.id }}">
+  <div class="iss-top">
+    <span class="iss-badge {{ it.status }}">{{ '해결됨' if it.status == 'closed' else '열림' }}</span>
+    <span class="iss-title">{{ it.title }}</span>
+    <span class="iss-meta">{{ it.author }} · {{ it.created_label }}</span>
+  </div>
+  {% if it.body %}<div class="iss-body">{{ it.body }}</div>{% endif %}
+  {% if it.images %}
+  <div class="iss-imgs">
+    {% for im in it.images %}<a href="{{ im }}" target="_blank"><img src="{{ im }}" alt="첨부"></a>{% endfor %}
+  </div>
+  {% endif %}
+
+  {% for c in it.comments %}
+  <div class="iss-cmt {% if c.close %}is-close{% endif %}">
+    <span class="iss-cmt-head"><b>{{ c.author }}</b> · {{ c.created_label }}{% if c.close %} <span class="iss-close-tag">해결로 닫음</span>{% endif %}</span>
+    {% if c.body %}<div class="iss-cmt-body">{{ c.body }}</div>{% endif %}
+    {% if c.images %}<div class="iss-imgs">{% for im in c.images %}<a href="{{ im }}" target="_blank"><img src="{{ im }}" alt="첨부"></a>{% endfor %}</div>{% endif %}
+  </div>
+  {% endfor %}
+
+  <div class="iss-reply">
+    <input class="iss-reply-author" type="text" placeholder="이름" value="WJ" autocomplete="off">
+    <input class="iss-reply-body" type="text" placeholder="댓글 달기..." autocomplete="off">
+    <button class="btn iss-cmt-send" data-id="{{ it.id }}">댓글</button>
+    {% if it.status == 'open' %}
+    <button class="btn iss-resolve" data-id="{{ it.id }}">해결됨으로 닫기</button>
+    {% else %}
+    <button class="btn iss-reopen" data-id="{{ it.id }}">다시 열기</button>
+    {% endif %}
+  </div>
+</div>
+{% else %}
+<p class="iss-empty">아직 이슈가 없습니다. 위에서 새 이슈를 올려보세요.</p>
+{% endfor %}

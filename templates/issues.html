@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>wj · 이슈</title>
+<link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
+<link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}?v=15">
+<style>
+  .iss-wrap{max-width:920px;margin:18px auto 60px;padding:0 24px;}
+  .iss-hero{display:flex;align-items:baseline;gap:12px;margin-bottom:14px;}
+  .iss-hero h2{margin:0;color:#fff;font-size:1.4rem;}
+  .iss-hero .sub{color:#cbd5e1;font-size:0.84rem;}
+
+  /* 새 이슈 작성 */
+  .iss-new{background:#fff;border-radius:12px;padding:16px 18px;box-shadow:0 6px 22px rgba(0,0,0,0.2);margin-bottom:18px;}
+  .iss-new input,.iss-new textarea{width:100%;box-sizing:border-box;border:1.5px solid var(--border);border-radius:8px;
+    padding:9px 11px;font-size:0.9rem;font-family:inherit;color:#1d2329;background:#fff;margin-bottom:9px;}
+  .iss-new textarea{min-height:88px;resize:vertical;line-height:1.55;}
+  .iss-new .row{display:flex;gap:9px;align-items:center;}
+  .iss-new .row .iss-author{flex:0 0 160px;margin-bottom:0;}
+  .iss-new .row .sp{flex:1;}
+  .btn{font-size:0.82rem;font-weight:800;border-radius:8px;padding:9px 16px;cursor:pointer;border:1px solid var(--border);background:#fff;color:#3d4b58;}
+  .btn.primary{background:var(--dash);color:#fff;border-color:var(--dash);}
+  .btn[disabled]{opacity:0.5;cursor:default;}
+
+  /* 이슈 카드 */
+  .iss-card{background:#fff;border-radius:12px;padding:15px 17px;box-shadow:0 4px 16px rgba(0,0,0,0.12);margin-bottom:13px;border-left:5px solid var(--dash);}
+  .iss-card.closed{border-left-color:#94a3b8;opacity:0.72;}
+  .iss-top{display:flex;align-items:center;gap:9px;flex-wrap:wrap;}
+  .iss-badge{font-size:0.68rem;font-weight:800;padding:2px 9px;border-radius:999px;color:#fff;background:var(--dash);}
+  .iss-badge.closed{background:#94a3b8;}
+  .iss-title{font-size:1.02rem;font-weight:800;color:var(--navy);flex:1;min-width:0;}
+  .iss-meta{font-size:0.72rem;color:var(--muted);white-space:nowrap;}
+  .iss-body{margin-top:9px;font-size:0.9rem;color:#243038;line-height:1.6;white-space:pre-wrap;}
+  .iss-imgs{margin-top:9px;display:flex;gap:8px;flex-wrap:wrap;}
+  .iss-imgs img{max-width:160px;max-height:130px;border-radius:8px;border:1px solid var(--border);object-fit:cover;}
+  .iss-cmt{margin-top:10px;padding:8px 11px;background:#f4f7fb;border-radius:8px;border-left:3px solid #cbd5e1;}
+  .iss-cmt.is-close{border-left-color:var(--dash);}
+  .iss-cmt-head{font-size:0.74rem;color:#42505d;}
+  .iss-cmt-head b{color:var(--navy);}
+  .iss-cmt-body{margin-top:3px;font-size:0.86rem;color:#243038;line-height:1.5;white-space:pre-wrap;}
+  .iss-close-tag{font-size:0.64rem;font-weight:800;color:var(--dash);background:var(--dash-bg);padding:1px 6px;border-radius:6px;}
+  .iss-reply{margin-top:11px;display:flex;gap:7px;align-items:center;flex-wrap:wrap;}
+  .iss-reply .iss-reply-author{flex:0 0 110px;}
+  .iss-reply .iss-reply-body{flex:1;min-width:140px;}
+  .iss-reply input{border:1.5px solid var(--border);border-radius:7px;padding:7px 10px;font-size:0.82rem;font-family:inherit;color:#1d2329;background:#fff;}
+  .iss-reply .btn{padding:7px 12px;font-size:0.76rem;}
+  .iss-reply .iss-resolve{color:var(--dash);border-color:var(--dash);}
+  .iss-empty{color:#cbd5e1;text-align:center;padding:40px 0;}
+
+  /* ===== 다크모드 ===== */
+  body.theme-dark .iss-new,
+  body.theme-dark .iss-card{background:#151d2b;box-shadow:0 6px 22px rgba(0,0,0,0.5);}
+  body.theme-dark .iss-new input,
+  body.theme-dark .iss-new textarea,
+  body.theme-dark .iss-reply input{background:#0e1626;color:#e2e8f0;border-color:#33415c;}
+  body.theme-dark .iss-title{color:#f1f5f9;}
+  body.theme-dark .iss-body,
+  body.theme-dark .iss-cmt-body{color:#dbe2ea;}
+  body.theme-dark .iss-cmt{background:#0f1826;border-left-color:#33415c;}
+  body.theme-dark .iss-cmt-head{color:#94a3b8;}
+  body.theme-dark .iss-cmt-head b{color:#e2e8f0;}
+  body.theme-dark .btn{background:#1b2740;color:#cbd5e1;border-color:#33415c;}
+  body.theme-dark .btn.primary{background:var(--dash);color:#fff;border-color:var(--dash);}
+</style>
+</head>
+<body class="dark">
+<div class="wrap">
+  <div class="topbar">
+    <span class="brand">wj<span class="dot">.</span></span>
+    {% include "_tabs.html" %}
+    <span class="topright" style="margin-left:auto;"><span class="sync-state">이슈 {{ issues|selectattr('status','equalto','open')|list|length }} 열림</span></span>
+  </div>
+
+  <div class="iss-wrap">
+    <div class="iss-hero">
+      <h2>🐞 이슈</h2>
+      <span class="sub">앱에서 이상하거나 나중에 개발할 것을 적어두고, 해결되면 닫습니다.</span>
+    </div>
+
+    <div class="iss-new">
+      <input type="text" id="new-title" placeholder="이슈 제목 (예: 메일 본문이 다크모드에서 안 보임)" autocomplete="off">
+      <textarea id="new-body" placeholder="어떤 부분이 어떻게 문제인지 / 무엇을 개발해야 하는지"></textarea>
+      <div class="row">
+        <input type="text" id="new-author" class="iss-author" placeholder="이름" value="WJ" autocomplete="off">
+        <span class="sp"></span>
+        <button class="btn primary" id="new-submit">이슈 올리기</button>
+      </div>
+    </div>
+
+    <div id="iss-list">{% include "_issues_list.html" %}</div>
+  </div>
+</div>
+
+<div id="toast" style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1f3a5f;color:#fff;padding:10px 18px;border-radius:8px;font-size:0.86rem;display:none;z-index:200;box-shadow:0 6px 20px rgba(0,0,0,0.25);"></div>
+
+<script>
+  function toast(m){ var t=document.getElementById('toast'); if(!t) return; t.textContent=m; t.style.display='block'; setTimeout(function(){t.style.display='none';},2200); }
+  function post(url, body){
+    return fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body||{})})
+      .then(function(r){ return r.json().catch(function(){ return {ok:false}; }); });
+  }
+  function refreshList(){
+    return fetch('/api/issues/list').then(function(r){ return r.text(); })
+      .then(function(html){ document.getElementById('iss-list').innerHTML = html; });
+  }
+  // 새 이슈 올리기
+  var submitBtn = document.getElementById('new-submit');
+  if (submitBtn) submitBtn.addEventListener('click', function(){
+    var title = (document.getElementById('new-title').value || '').trim();
+    if (!title){ toast('제목을 적어주세요'); return; }
+    var body = document.getElementById('new-body').value || '';
+    var author = document.getElementById('new-author').value || 'WJ';
+    submitBtn.disabled = true;
+    post('/api/issues', {title:title, body:body, author:author}).then(function(j){
+      submitBtn.disabled = false;
+      if (j && j.ok){
+        document.getElementById('new-title').value = '';
+        document.getElementById('new-body').value = '';
+        toast('이슈를 올렸습니다');
+        refreshList();
+      } else { toast('등록 실패'); }
+    });
+  });
+  // 댓글 / 닫기 / 다시 열기 (목록은 AJAX 로 갈리므로 위임)
+  document.getElementById('iss-list').addEventListener('click', function(e){
+    var card = e.target.closest('.iss-card'); if (!card) return;
+    var id = card.getAttribute('data-id');
+    var authorEl = card.querySelector('.iss-reply-author');
+    var bodyEl = card.querySelector('.iss-reply-body');
+    var author = authorEl ? authorEl.value : 'WJ';
+
+    if (e.target.closest('.iss-cmt-send')){
+      var b = bodyEl ? (bodyEl.value || '').trim() : '';
+      if (!b){ toast('댓글 내용을 적어주세요'); return; }
+      post('/api/issues/' + id + '/comment', {author:author, body:b}).then(function(j){
+        if (j && j.ok){ refreshList(); } else { toast('댓글 실패'); }
+      });
+      return;
+    }
+    if (e.target.closest('.iss-resolve')){
+      var note = bodyEl ? (bodyEl.value || '').trim() : '';
+      post('/api/issues/' + id + '/comment', {author:author, body:note, close:true}).then(function(j){
+        if (j && j.ok){ toast('해결됨으로 닫았습니다'); refreshList(); } else { toast('실패'); }
+      });
+      return;
+    }
+    if (e.target.closest('.iss-reopen')){
+      post('/api/issues/' + id + '/status', {status:'open'}).then(function(j){
+        if (j && j.ok){ toast('다시 열었습니다'); refreshList(); } else { toast('실패'); }
+      });
+      return;
+    }
+  });
+</script>
+</body>
+</html>
