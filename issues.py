@@ -6,10 +6,17 @@
 """
 from __future__ import annotations
 
+import contextlib
 import json as _json
 import os
 import time
+import uuid
 from pathlib import Path
+
+try:
+    import fcntl  # POSIX 파일 락 (동시 read-modify-write 보호)
+except Exception:  # pragma: no cover
+    fcntl = None
 
 _PATH = Path(
     os.environ.get(
@@ -73,12 +80,56 @@ def image_path(name: str):
     return p if p.is_file() else None
 
 
+@contextlib.contextmanager
+def _locked():
+    """issues.json read-modify-write 임계구역(프로세스 간 flock). fcntl 없으면 무락."""
+    if fcntl is None:
+        yield
+        return
+    try:
+        _PATH.parent.mkdir(parents=True, exist_ok=True)
+    except Exception:
+        pass
+    f = None
+    try:
+        f = open(_PATH.with_suffix(".lock"), "w")
+        fcntl.flock(f, fcntl.LOCK_EX)
+        yield
+    finally:
+        if f is not None:
+            try:
+                fcntl.flock(f, fcntl.LOCK_UN)
+            except Exception:
+                pass
+            f.close()
+
+
 def _load() -> list:
     try:
-        d = _json.loads(_PATH.read_text(encoding="utf-8"))
-        return d if isinstance(d, list) else []
+        raw = _PATH.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return []
     except Exception:
         return []
+    try:
+        d = _json.loads(raw)
+    except Exception:
+        # 깨진 JSON: 그대로 덮어쓰면 유실되므로 백업해두고 빈 목록으로 시작
+        try:
+            _PATH.rename(_PATH.with_suffix(".corrupt.%d" % int(time.time())))
+        except Exception:
+            pass
+        return []
+    if not isinstance(d, list):
+        return []
+    out = []
+    for it in d:
+        if not isinstance(it, dict):
+            continue
+        if not isinstance(it.get("comments"), list):
+            it["comments"] = []
+        out.append(it)
+    return out
 
 
 def _save(items: list) -> bool:
@@ -108,7 +159,8 @@ def _safe_imgs(images) -> list:
     out = []
     for x in images or []:
         u = _norm(x)
-        if u and ((u.startswith("/") and not u.startswith("//")) or u.lower().startswith("https://")):
+        # 이 앱이 업로드한 첨부만 허용(외부 URL/추적 픽셀/임의 경로 차단)
+        if u.startswith("/api/issues/image/") and "//" not in u[1:] and ".." not in u:
             out.append(u)
     return out
 
@@ -143,9 +195,8 @@ def add(title: str, body: str, author: str, images=None) -> dict:
     title = _norm(title)
     if not title:
         return {}
-    items = _load()
     issue = {
-        "id": "iss_" + str(int(time.time() * 1000)),
+        "id": "iss_" + uuid.uuid4().hex[:12],
         "title": title,
         "body": _norm(body),
         "author": _norm(author, "WJ"),
@@ -154,8 +205,11 @@ def add(title: str, body: str, author: str, images=None) -> dict:
         "comments": [],
         "created": int(time.time()),
     }
-    items.append(issue)
-    return issue if _save(items) else {}
+    with _locked():
+        items = _load()
+        items.append(issue)
+        ok = _save(items)
+    return issue if ok else {}
 
 
 def add_comment(issue_id: str, author: str, body: str, images=None, close: bool = False) -> bool:
@@ -164,28 +218,30 @@ def add_comment(issue_id: str, author: str, body: str, images=None, close: bool 
     imgs = _safe_imgs(images)
     if not body and not imgs and not close:
         return False
-    items = _load()
-    for it in items:
-        if it.get("id") == issue_id:
-            it.setdefault("comments", []).append({
-                "author": _norm(author, "WJ"),
-                "body": body,
-                "images": imgs,
-                "close": bool(close),
-                "created": int(time.time()),
-            })
-            if close:
-                it["status"] = "closed"
-            return _save(items)
+    with _locked():
+        items = _load()
+        for it in items:
+            if it.get("id") == issue_id:
+                it.setdefault("comments", []).append({
+                    "author": _norm(author, "WJ"),
+                    "body": body,
+                    "images": imgs,
+                    "close": bool(close),
+                    "created": int(time.time()),
+                })
+                if close:
+                    it["status"] = "closed"
+                return _save(items)
     return False
 
 
 def set_status(issue_id: str, status: str) -> bool:
     if status not in ("open", "closed"):
         return False
-    items = _load()
-    for it in items:
-        if it.get("id") == issue_id:
-            it["status"] = status
-            return _save(items)
+    with _locked():
+        items = _load()
+        for it in items:
+            if it.get("id") == issue_id:
+                it["status"] = status
+                return _save(items)
     return False

@@ -9,7 +9,7 @@
   {% if it.body %}<div class="iss-body">{{ it.body }}</div>{% endif %}
   {% if it.images %}
   <div class="iss-imgs">
-    {% for im in it.images %}<a href="{{ im }}" target="_blank"><img src="{{ im }}" alt="첨부"></a>{% endfor %}
+    {% for im in it.images %}<a href="{{ im }}" target="_blank" rel="noopener noreferrer"><img src="{{ im }}" alt="첨부"></a>{% endfor %}
   </div>
   {% endif %}
 
@@ -17,7 +17,7 @@
   <div class="iss-cmt {% if c.close %}is-close{% endif %}">
     <span class="iss-cmt-head"><b>{{ c.author }}</b> · {{ c.created_label }}{% if c.close %} <span class="iss-close-tag">해결로 닫음</span>{% endif %}</span>
     {% if c.body %}<div class="iss-cmt-body">{{ c.body }}</div>{% endif %}
-    {% if c.images %}<div class="iss-imgs">{% for im in c.images %}<a href="{{ im }}" target="_blank"><img src="{{ im }}" alt="첨부"></a>{% endfor %}</div>{% endif %}
+    {% if c.images %}<div class="iss-imgs">{% for im in c.images %}<a href="{{ im }}" target="_blank" rel="noopener noreferrer"><img src="{{ im }}" alt="첨부"></a>{% endfor %}</div>{% endif %}
   </div>
   {% endfor %}
 

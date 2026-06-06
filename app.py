@@ -36,6 +36,7 @@ import email_view
 
 app = Flask(__name__, static_folder="static", template_folder="templates")
 app.config["TEMPLATES_AUTO_RELOAD"] = True
+app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024  # 업로드 본문 상한(이슈 이미지 등). 초과 시 413
 # WebSocket keepalive — cloudflared/모바일망 idle 끊김 방지 (claude crunch 2m+ 구간 보호)
 app.config["SOCK_SERVER_OPTIONS"] = {"ping_interval": 25}
 sock = Sock(app)
@@ -1426,25 +1427,35 @@ def issues_list():
 def issues_create():
     import issues
     data = request.get_json(silent=True) or {}
+    if not (data.get("title") or "").strip():
+        return jsonify({"ok": False, "error": "제목을 입력하세요"}), 400
     iss = issues.add(data.get("title"), data.get("body"), data.get("author"), data.get("images"))
-    return jsonify({"ok": bool(iss), "id": iss.get("id")})
+    if not iss:
+        return jsonify({"ok": False, "error": "저장 실패"}), 500
+    return jsonify({"ok": True, "id": iss.get("id")})
 
 
 @app.post("/api/issues/<iid>/comment")
 def issues_comment(iid: str):
     import issues
+    if not issues.get(iid):
+        return jsonify({"ok": False, "error": "이슈를 찾을 수 없습니다"}), 404
     data = request.get_json(silent=True) or {}
     ok = issues.add_comment(iid, data.get("author"), data.get("body"),
                             data.get("images"), bool(data.get("close")))
-    return jsonify({"ok": ok})
+    return jsonify({"ok": ok}), (200 if ok else 400)
 
 
 @app.post("/api/issues/<iid>/status")
 def issues_status(iid: str):
     import issues
     data = request.get_json(silent=True) or {}
+    if data.get("status") not in ("open", "closed"):
+        return jsonify({"ok": False, "error": "status 는 open|closed"}), 400
+    if not issues.get(iid):
+        return jsonify({"ok": False, "error": "이슈를 찾을 수 없습니다"}), 404
     ok = issues.set_status(iid, data.get("status"))
-    return jsonify({"ok": ok})
+    return jsonify({"ok": ok}), (200 if ok else 500)
 
 
 @app.post("/api/issues/upload")
@@ -1467,6 +1478,11 @@ def issues_image(name: str):
         return "", 404
     from flask import send_file
     return send_file(str(p))
+
+
+@app.errorhandler(413)
+def _payload_too_large(e):
+    return jsonify({"ok": False, "error": "업로드가 너무 큽니다(최대 16MB)"}), 413
 
 
 if __name__ == "__main__":
