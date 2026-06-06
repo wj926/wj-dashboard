@@ -186,6 +186,12 @@
   .pri-opt.on{opacity:1;}
   .pri-opt:hover{opacity:0.75;}
   .pri-opt.on:hover{opacity:1;}
+  .qbar{display:flex;gap:6px;align-items:center;padding:6px 8px;border-bottom:1px solid var(--border);}
+  .q-search{flex:1;min-width:0;border:1.5px solid var(--navy);border-radius:7px;padding:6px 9px;font-size:0.76rem;color:#1d2329;background:#fff;}
+  .q-search:focus{outline:none;box-shadow:0 0 0 2px rgba(31,58,102,0.2);}
+  .q-sort{border:1.5px solid var(--navy);border-radius:7px;padding:6px 5px;font-size:0.73rem;background:#fff;color:#1d2329;cursor:pointer;}
+  .q-unread{font-size:0.72rem;font-weight:700;padding:6px 9px;border:1.5px solid var(--navy);border-radius:7px;color:var(--navy);background:#fff;cursor:pointer;user-select:none;white-space:nowrap;}
+  .q-unread.on{background:var(--navy);color:#fff;}
   .sent-tag{display:inline-flex;align-items:center;gap:5px;font-size:0.66rem;font-weight:800;color:#fff;
     background:var(--dash);border-radius:6px;padding:3px 9px;}
   .tone-pick{user-select:none;}
@@ -337,6 +343,15 @@
       <div class="qhead">
         <h3>처리 큐</h3>
         <span class="prog">오늘 {{ progress.total }}통 중 {{ progress.idx }}번째</span>
+      </div>
+      <div class="qbar">
+        <input type="text" id="q-search" class="q-search" placeholder="제목·발신자·내용 검색" autocomplete="off" value="{{ q or '' }}">
+        <select id="q-sort" class="q-sort" title="정렬">
+          <option value="priority" {% if (sort or 'priority') == 'priority' %}selected{% endif %}>우선순위순</option>
+          <option value="newest" {% if sort == 'newest' %}selected{% endif %}>최신순</option>
+          <option value="oldest" {% if sort == 'oldest' %}selected{% endif %}>오래된순</option>
+        </select>
+        <span id="q-unread" class="q-unread{% if unread_only %} on{% endif %}" title="안 읽은 메일만">안읽음</span>
       </div>
       <div id="queue-items">{% include "_email_queue_items.html" %}</div>
 
@@ -523,16 +538,18 @@
     if (progEl && ix >= 0) progEl.textContent = '오늘 ' + allItems.length + '통 중 ' + (ix + 1) + '번째';
     var focusEl = document.getElementById('em-focus');
     focusEl.style.opacity = '0.5';
-    // draft/cal 패널은 center 와 독립이므로 동시에 발사한다(터널 왕복이 직렬로 누적되던 딜레이 제거)
-    refreshDraftPane(id);
-    refreshCalPane(id);
-    fetch('/api/email/center?id=' + encodeURIComponent(id))
-      .then(function(r){ return r.text(); })
-      .then(function(html){
-        focusEl.innerHTML = html;
+    // center + draft + cal 을 한 요청으로 받아 터널 왕복을 1회로 줄인다(서버도 큐 1회만 재빌드)
+    fetch('/api/email/message-view?id=' + encodeURIComponent(id))
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        focusEl.innerHTML = j.center || '';
+        var pd = document.getElementById('pane-draft');
+        var pc = document.getElementById('pane-cal');
+        if (pd && j.draft != null) pd.innerHTML = j.draft;
+        if (pc && j.cal != null) pc.innerHTML = j.cal;
         focusEl.style.opacity = '1';
         focusEl.scrollTop = 0;
-        history.replaceState(null, '', '/email?id=' + encodeURIComponent(id));
+        history.replaceState(null, '', '/email' + (emailQueueParams(id) || ('?id=' + encodeURIComponent(id))));
         foldQuotes(focusEl);
         if (mqMobile.matches){
           grid.classList.add('m-detail'); grid.classList.add('m-body'); setSeg('body'); grid.scrollTop = 0;
@@ -722,6 +739,23 @@
     }
   });
 
+  // 초안 편집 자동저장(debounce). 발송 아님 — 미발송 초안의 text 만 갱신해 보존.
+  var _draftSaveTimer = null;
+  if (paneDraft) paneDraft.addEventListener('input', function(e){
+    var ta = e.target.closest('#draft-edit'); if (!ta) return;
+    var mid = currentMailId(); if (!mid) return;
+    clearTimeout(_draftSaveTimer);
+    _draftSaveTimer = setTimeout(function(){
+      fetch('/api/email/messages/' + mid + '/draft/save', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({text: ta.value})})
+        .then(function(r){ return r.json().catch(function(){ return {ok:false}; }); })
+        .then(function(j){
+          var tag = paneDraft.querySelector('.unsent-tag');
+          if (j && j.ok && tag){ tag.textContent = '● 미발송 초안 · 저장됨'; }
+        })
+        .catch(function(){});
+    }, 900);
+  });
+
   // ---- 일정 후보: 감지 / 무시 / 되살리기 (캘린더 등록은 S4b 에서 연결) ----
   var paneCal = document.getElementById('pane-cal');
   function refreshCalPane(id){
@@ -808,15 +842,40 @@
   }
   function currentMailId(){
     var m = location.search.match(/[?&]id=([^&]+)/);
-    return m ? decodeURIComponent(m[1]) : '';
+    if (m) return decodeURIComponent(m[1]);
+    // id 없이 열린 초기 로드: 서버가 큐 첫 메일을 포커스하므로 초안 패널의 data-id 로 폴백
+    var el = document.querySelector('#pane-draft [data-id]');
+    return el ? el.getAttribute('data-id') : '';
+  }
+  function emailQueueParams(explicitId){
+    var p = [];
+    var id = explicitId || currentMailId(); if (id) p.push('id=' + encodeURIComponent(id));
+    var sortEl = document.getElementById('q-sort');
+    var sort = sortEl ? sortEl.value : 'priority';
+    if (sort && sort !== 'priority') p.push('sort=' + sort);
+    var qEl = document.getElementById('q-search');
+    var q = qEl ? (qEl.value || '').trim() : '';
+    if (q) p.push('q=' + encodeURIComponent(q));
+    var unEl = document.getElementById('q-unread');
+    if (unEl && unEl.classList.contains('on')) p.push('unread=1');
+    return p.length ? ('?' + p.join('&')) : '';
   }
   function refreshQueue(){
     var qi = document.getElementById('queue-items'); if (!qi) return;
-    var id = currentMailId();
-    fetch('/api/email/queue-pane' + (id ? ('?id=' + encodeURIComponent(id)) : ''))
+    fetch('/api/email/queue-pane' + emailQueueParams())
       .then(function(r){ return r.text(); })
       .then(function(html){ qi.innerHTML = html; }).catch(function(){});
   }
+  // 검색/정렬/안읽음 컨트롤 -> 큐 갱신
+  (function(){
+    var qEl = document.getElementById('q-search');
+    var sortEl = document.getElementById('q-sort');
+    var unEl = document.getElementById('q-unread');
+    var t = null;
+    if (qEl) qEl.addEventListener('input', function(){ clearTimeout(t); t = setTimeout(refreshQueue, 300); });
+    if (sortEl) sortEl.addEventListener('change', refreshQueue);
+    if (unEl) unEl.addEventListener('click', function(){ unEl.classList.toggle('on'); refreshQueue(); });
+  })();
   function addRule(){
     var inp = document.getElementById('rule-text'); if (!inp) return;
     var text = (inp.value || '').trim();

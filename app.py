@@ -311,9 +311,15 @@ def email_page():
     view = email_view.build_email_view(
         selected_id=request.args.get("id"),
         query=request.args.get("q"),
+        sort=request.args.get("sort") or "priority",
+        unread_only=(request.args.get("unread") == "1"),
         allow_fallback=True,  # 읽기 전용 페이지: 오래된 링크면 큐 첫 메일로 매끄럽게
     )
     view["active_tab"] = "email"
+    # 큐 컨트롤 초기 상태(URL 파라미터와 일치시켜 다음 갱신에서 필터가 떨어지지 않게)
+    view["q"] = request.args.get("q") or ""
+    view["sort"] = request.args.get("sort") or "priority"
+    view["unread_only"] = (request.args.get("unread") == "1")
     import email_persona
     view["persona"] = email_persona.load()
     # 모바일이면 device-width viewport + 세로 스택 레이아웃(데스크톱은 그대로 width=1400).
@@ -327,6 +333,26 @@ def email_center():
     """큐 메일 클릭 시 중앙 본문만 부분 렌더(AJAX, 새로고침 없이 교체)."""
     view = email_view.build_email_view(selected_id=request.args.get("id"), allow_fallback=True)
     return render_template("_email_center.html", focus=view.get("focus") or {})
+
+
+@app.route("/api/email/message-view")
+def email_message_view():
+    """메일 전환용: center + draft + cal 을 build_email_view 1회로 묶어 반환.
+
+    기존엔 클릭 시 center/draft-pane/cal-pane 3개 요청(=터널 왕복 3회 + 큐 3회 재빌드)이
+    나갔다. 이걸 1회로 합쳐 체감 지연을 줄인다.
+    """
+    mid = request.args.get("id")
+    view = email_view.build_email_view(selected_id=mid, allow_fallback=True)
+    focus = view.get("focus") or {}
+    fid = focus.get("id") or mid
+    return jsonify({
+        "center": render_template("_email_center.html", focus=focus),
+        "draft": render_template("_email_panel_draft.html",
+                                 draft=view.get("draft") or {"status": "none"}, focus_id=fid),
+        "cal": render_template("_email_panel_cal.html",
+                               candidates=view.get("candidates") or [], focus_id=fid),
+    })
 
 
 @app.post("/api/email/messages/<mid>/hide")
@@ -467,6 +493,24 @@ def email_draft_discard(mid):
     import email_store
     email_store.clear_draft(mid)
     return jsonify({"ok": True})
+
+
+@app.post("/api/email/messages/<mid>/draft/save")
+def email_draft_save(mid):
+    """초안 편집 내용 저장(미발송 유지). 발송 아님. 기존 초안의 text 만 갱신한다."""
+    import email_store
+    data = request.get_json(silent=True) or {}
+    text = data.get("text")
+    if text is None:
+        return jsonify({"ok": False, "error": "text 없음"}), 400
+    d = email_store.get_draft(mid) or {}
+    if not d:
+        return jsonify({"ok": False, "error": "초안 없음"}), 404
+    d["text"] = text
+    d["status"] = "unsent"
+    d["edited"] = True
+    ok = email_store.save_draft(mid, d)
+    return jsonify({"ok": ok})
 
 
 @app.post("/api/email/messages/<mid>/priority")
@@ -639,8 +683,13 @@ def email_rules_pane():
 
 @app.route("/api/email/queue-pane")
 def email_queue_pane():
-    """좌측 큐 항목 부분 렌더(규칙 추가/토글 후 우선순위 즉시 반영용)."""
-    view = email_view.build_email_view(selected_id=request.args.get("id"))
+    """좌측 큐 항목 부분 렌더(규칙 추가/토글/정렬·검색·필터 변경 후 즉시 반영용)."""
+    view = email_view.build_email_view(
+        selected_id=request.args.get("id"),
+        query=request.args.get("q"),
+        sort=request.args.get("sort") or "priority",
+        unread_only=(request.args.get("unread") == "1"),
+    )
     return render_template("_email_queue_items.html", queue=view.get("queue") or [])
 
 

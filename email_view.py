@@ -175,7 +175,8 @@ def _needs_auth_view() -> dict:
 
 
 def build_email_view(services=None, selected_id: str | None = None, query: str | None = None,
-                     allow_fallback: bool = False) -> dict:
+                     allow_fallback: bool = False, sort: str = "priority",
+                     unread_only: bool = False) -> dict:
     """email_data.build_view() 와 같은 shape 를 반환. 절대 raise 하지 않는다."""
     try:
         if services is None:
@@ -203,14 +204,15 @@ def build_email_view(services=None, selected_id: str | None = None, query: str |
         if not messages:
             # 캐시 비었고 fetch 도 실패 == 인증 실패/토큰 만료/Google 실패.
             return _needs_auth_view()
-        return _build_real_view(messages, selected_id, allow_fallback)
+        return _build_real_view(messages, selected_id, allow_fallback, query, sort, unread_only)
     except Exception:
         # 어떤 경로로도 예외가 새 나가면 안 된다.
         return _needs_auth_view()
 
 
 def _build_real_view(messages: list[dict], selected_id: str | None,
-                     allow_fallback: bool = False) -> dict:
+                     allow_fallback: bool = False, query: str | None = None,
+                     sort: str = "priority", unread_only: bool = False) -> dict:
     """캐시된 정규화 메시지(본문 포함) -> 템플릿 view dict. 추가 API 호출 없음.
 
     캐시 메시지에 이미 body 가 있으므로 포커스 본문도 get_message 없이 바로 쓴다.
@@ -242,6 +244,7 @@ def _build_real_view(messages: list[dict], selected_id: str | None,
                 latest[tid] = m
         messages = sorted(latest.values(), key=lambda x: x.get("internal_ts") or 0, reverse=True)
 
+        q_norm = (query or "").strip().lower()
         queue = []
         by_id = {}
         for m in messages:
@@ -252,6 +255,20 @@ def _build_real_view(messages: list[dict], selected_id: str | None,
             if mid in hidden:
                 continue    # 화면(큐)에서만 제외. 실제 Gmail 은 그대로.
             headers = m.get("headers") or {}
+            # 안읽음/검색 필터 — 큐 표시에서만 제외(by_id 엔 남아 영수증/조회 가능)
+            is_unread = "UNREAD" in (m.get("label_ids") or [])
+            if unread_only and not is_unread:
+                continue
+            if q_norm:
+                _body = m.get("body") or {}
+                hay = (
+                    (headers.get("subject") or "") + " "
+                    + (headers.get("from") or "") + " "
+                    + (m.get("snippet") or "") + " "
+                    + (_body.get("text") or "")
+                ).lower()
+                if q_norm not in hay:
+                    continue
             s = email_score.score(m)
             if rules:
                 s = email_rules.apply_to(m, s, rules)
@@ -285,13 +302,20 @@ def _build_real_view(messages: list[dict], selected_id: str | None,
                 "has_event": s["has_event"],
                 "has_draft": bool(drafts_map.get(mid)),
                 "current": False,
+                "unread": is_unread,
+                "internal_ts": m.get("internal_ts") or 0,
                 "resurfaced": resurfaced,
                 "resurfaced_reason": ("마감 임박" if resurfaced and s["priority"] == "p0" else ("시간 됨" if resurfaced else "")),
             }
             queue.append(qitem)
 
-        # 우선순위 정렬(p0>p1>p2). 같은 우선순위는 기존 순서(최신순) 유지.
-        queue.sort(key=lambda q: email_score.order_key(q.get("priority", "p2")))
+        # 정렬: 기본 우선순위(p0>p1>p2), 또는 날짜순(newest/oldest)
+        if sort == "newest":
+            queue.sort(key=lambda x: x.get("internal_ts") or 0, reverse=True)
+        elif sort == "oldest":
+            queue.sort(key=lambda x: x.get("internal_ts") or 0)
+        else:
+            queue.sort(key=lambda q: email_score.order_key(q.get("priority", "p2")))
 
         focus = {}
         target_id = selected_id or (queue[0]["id"] if queue else None)
