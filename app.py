@@ -1447,5 +1447,27 @@ def issues_status(iid: str):
     return jsonify({"ok": ok})
 
 
+@app.post("/api/issues/upload")
+def issues_upload():
+    """이슈 첨부 이미지 업로드(드래그/Ctrl+V). 바이트로 형식 검증 후 저장, URL 반환."""
+    import issues
+    f = request.files.get("file")
+    if f is None:
+        return jsonify({"ok": False, "error": "파일 없음"}), 400
+    res = issues.save_image(f.read())
+    return jsonify(res), (200 if res.get("ok") else 400)
+
+
+@app.get("/api/issues/image/<name>")
+def issues_image(name: str):
+    """업로드된 이슈 이미지 서빙(디렉토리 탈출 방지)."""
+    import issues
+    p = issues.image_path(name)
+    if p is None:
+        return "", 404
+    from flask import send_file
+    return send_file(str(p))
+
+
 if __name__ == "__main__":
     app.run(host=SETTINGS.host, port=SETTINGS.port, debug=False)

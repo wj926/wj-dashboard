@@ -17,6 +17,60 @@ _PATH = Path(
         str(Path.home() / ".config" / "wj-dashboard" / "issues.json"),
     )
 )
+_IMG_DIR = Path(
+    os.environ.get(
+        "WJ_ISSUE_IMG_DIR",
+        str(Path.home() / ".config" / "wj-dashboard" / "issue_images"),
+    )
+)
+# 매직넘버 -> 확장자 (확장자 위조 방지: 실제 바이트로 이미지 형식 확인)
+_IMG_MAGIC = [
+    (b"\x89PNG\r\n\x1a\n", "png"),
+    (b"\xff\xd8\xff", "jpg"),
+    (b"GIF87a", "gif"),
+    (b"GIF89a", "gif"),
+]
+_IMG_MAX_BYTES = 10 * 1024 * 1024
+
+
+def _sniff_ext(data: bytes) -> str:
+    """파일 첫 바이트로 이미지 형식 판별. webp 는 RIFF....WEBP. 아니면 ''."""
+    for magic, ext in _IMG_MAGIC:
+        if data.startswith(magic):
+            return ext
+    if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return "webp"
+    return ""
+
+
+def save_image(data: bytes) -> dict:
+    """이미지 바이트를 저장하고 서빙 URL 을 돌려준다. 실제 바이트로 형식 검증."""
+    if not data or len(data) > _IMG_MAX_BYTES:
+        return {"ok": False, "error": "파일이 없거나 너무 큽니다(최대 10MB)"}
+    ext = _sniff_ext(data)
+    if not ext:
+        return {"ok": False, "error": "이미지 파일만 가능합니다(png/jpg/gif/webp)"}
+    try:
+        import secrets
+        _IMG_DIR.mkdir(parents=True, exist_ok=True)
+        name = "img_%d_%s.%s" % (int(time.time() * 1000), secrets.token_hex(4), ext)
+        (_IMG_DIR / name).write_bytes(data)
+        try:
+            os.chmod(_IMG_DIR / name, 0o600)
+        except Exception:
+            pass
+        return {"ok": True, "url": "/api/issues/image/" + name}
+    except Exception as e:
+        return {"ok": False, "error": type(e).__name__}
+
+
+def image_path(name: str):
+    """서빙용 안전 경로. basename 만 허용(디렉토리 탈출 방지). 없으면 None."""
+    safe = os.path.basename(name or "")
+    if not safe or safe != (name or "") or safe.startswith("."):
+        return None
+    p = _IMG_DIR / safe
+    return p if p.is_file() else None
 
 
 def _load() -> list:

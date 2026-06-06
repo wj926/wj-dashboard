@@ -17,6 +17,14 @@
   .iss-new input,.iss-new textarea{width:100%;box-sizing:border-box;border:1.5px solid var(--border);border-radius:8px;
     padding:9px 11px;font-size:0.9rem;font-family:inherit;color:#1d2329;background:#fff;margin-bottom:9px;}
   .iss-new textarea{min-height:88px;resize:vertical;line-height:1.55;}
+  .iss-drop{border:1.5px dashed var(--border);border-radius:8px;padding:12px;text-align:center;
+    font-size:0.8rem;color:var(--muted);cursor:default;margin-bottom:9px;background:#fafbfc;}
+  .iss-drop.over{border-color:var(--dash);background:var(--dash-bg);color:var(--dash);}
+  .iss-preview{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:9px;}
+  .iss-preview .pv{position:relative;}
+  .iss-preview img{max-width:120px;max-height:100px;border-radius:8px;border:1px solid var(--border);object-fit:cover;display:block;}
+  .iss-preview .pv-x{position:absolute;top:-7px;right:-7px;width:20px;height:20px;border-radius:50%;
+    background:var(--p0,#7a1a25);color:#fff;border:none;cursor:pointer;font-size:0.7rem;line-height:1;font-weight:800;}
   .iss-new .row{display:flex;gap:9px;align-items:center;}
   .iss-new .row .iss-author{flex:0 0 160px;margin-bottom:0;}
   .iss-new .row .sp{flex:1;}
@@ -55,6 +63,7 @@
   body.theme-dark .iss-new input,
   body.theme-dark .iss-new textarea,
   body.theme-dark .iss-reply input{background:#0e1626;color:#e2e8f0;border-color:#33415c;}
+  body.theme-dark .iss-drop{background:#0e1626;border-color:#33415c;color:#94a3b8;}
   body.theme-dark .iss-title{color:#f1f5f9;}
   body.theme-dark .iss-body,
   body.theme-dark .iss-cmt-body{color:#dbe2ea;}
@@ -82,6 +91,8 @@
     <div class="iss-new">
       <input type="text" id="new-title" placeholder="이슈 제목 (예: 메일 본문이 다크모드에서 안 보임)" autocomplete="off">
       <textarea id="new-body" placeholder="어떤 부분이 어떻게 문제인지 / 무엇을 개발해야 하는지"></textarea>
+      <div class="iss-drop" id="iss-drop">📷 이미지를 여기로 드래그하거나, 캡처 후 <b>Ctrl+V</b> 로 붙여넣기</div>
+      <div class="iss-preview" id="iss-preview"></div>
       <div class="row">
         <input type="text" id="new-author" class="iss-author" placeholder="이름" value="WJ" autocomplete="off">
         <span class="sp"></span>
@@ -105,6 +116,48 @@
     return fetch('/api/issues/list').then(function(r){ return r.text(); })
       .then(function(html){ document.getElementById('iss-list').innerHTML = html; });
   }
+  // ---- 이미지 업로드 (드래그 / Ctrl+V 붙여넣기) ----
+  var newImages = [];
+  function renderPreview(){
+    var p = document.getElementById('iss-preview'); if (!p) return;
+    p.innerHTML = '';
+    newImages.forEach(function(u, i){
+      var d = document.createElement('span'); d.className = 'pv';
+      var img = document.createElement('img'); img.src = u;
+      var x = document.createElement('button'); x.className = 'pv-x'; x.title = '제거';
+      x.setAttribute('data-i', i); x.textContent = '×';
+      d.appendChild(img); d.appendChild(x); p.appendChild(d);
+    });
+  }
+  function uploadImage(file){
+    if (!file || file.type.indexOf('image/') !== 0) return;
+    var fd = new FormData(); fd.append('file', file);
+    fetch('/api/issues/upload', {method:'POST', body:fd})
+      .then(function(r){ return r.json().catch(function(){ return {ok:false}; }); })
+      .then(function(j){
+        if (j && j.ok && j.url){ newImages.push(j.url); renderPreview(); }
+        else { toast((j && j.error) || '이미지 업로드 실패'); }
+      }).catch(function(){ toast('이미지 업로드 실패'); });
+  }
+  function handleFiles(files){ for (var i=0;i<files.length;i++) uploadImage(files[i]); }
+  (function(){
+    var prev = document.getElementById('iss-preview');
+    if (prev) prev.addEventListener('click', function(e){
+      var x = e.target.closest('.pv-x'); if (!x) return;
+      newImages.splice(parseInt(x.getAttribute('data-i'), 10), 1); renderPreview();
+    });
+    var drop = document.getElementById('iss-drop');
+    if (drop){
+      ['dragover','dragenter'].forEach(function(ev){ drop.addEventListener(ev, function(e){ e.preventDefault(); drop.classList.add('over'); }); });
+      ['dragleave','dragend'].forEach(function(ev){ drop.addEventListener(ev, function(e){ e.preventDefault(); drop.classList.remove('over'); }); });
+      drop.addEventListener('drop', function(e){ e.preventDefault(); drop.classList.remove('over'); if (e.dataTransfer && e.dataTransfer.files) handleFiles(e.dataTransfer.files); });
+    }
+    var newCard = document.querySelector('.iss-new');
+    if (newCard) newCard.addEventListener('paste', function(e){
+      var items = (e.clipboardData || {}).items || [];
+      for (var i=0;i<items.length;i++){ if (items[i].type.indexOf('image/') === 0){ var f = items[i].getAsFile(); if (f) uploadImage(f); } }
+    });
+  })();
   // 새 이슈 올리기
   var submitBtn = document.getElementById('new-submit');
   if (submitBtn) submitBtn.addEventListener('click', function(){
@@ -113,11 +166,12 @@
     var body = document.getElementById('new-body').value || '';
     var author = document.getElementById('new-author').value || 'WJ';
     submitBtn.disabled = true;
-    post('/api/issues', {title:title, body:body, author:author}).then(function(j){
+    post('/api/issues', {title:title, body:body, author:author, images:newImages}).then(function(j){
       submitBtn.disabled = false;
       if (j && j.ok){
         document.getElementById('new-title').value = '';
         document.getElementById('new-body').value = '';
+        newImages = []; renderPreview();
         toast('이슈를 올렸습니다');
         refreshList();
       } else { toast('등록 실패'); }
