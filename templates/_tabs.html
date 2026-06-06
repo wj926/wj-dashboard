@@ -7,4 +7,44 @@
     <svg class="tt-icn" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
     생각
   </a>
+  <a class="tt {% if active_tab == 'email' %}on{% endif %}" href="/email">
+    <svg class="tt-icn" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
+    메일
+  </a>
+  <span class="theme-tg" id="theme-tg" title="다크/라이트 전환">🌙</span>
 </div>
+<style>
+  .theme-tg{display:inline-flex;align-items:center;justify-content:center;width:32px;height:30px;
+    margin-left:8px;border-radius:8px;cursor:pointer;font-size:1rem;line-height:1;
+    background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.18);}
+  .theme-tg:hover{background:rgba(255,255,255,0.2);}
+  /* ===== 다크모드(업무·생각): 흰 카드 어둡게 + 글씨 밝게 ===== */
+  body.theme-dark .tile, body.theme-dark .panel, body.theme-dark .proj-tile,
+  body.theme-dark .chat-body, body.theme-dark .chat-input-row, body.theme-dark .c,
+  body.theme-dark .fc-big, body.theme-dark .cb-card, body.theme-dark .ts-tree,
+  body.theme-dark .recent, body.theme-dark .qbox{background:#151d2b;border-color:#33415c;}
+  body.theme-dark .proj-tile{background:#19233440;}
+  body.theme-dark{color:#cbd5e1;}
+  body.theme-dark .pname, body.theme-dark .ttl, body.theme-dark .ttl a,
+  body.theme-dark .tt-h, body.theme-dark .tt-cat-name, body.theme-dark .tt-page,
+  body.theme-dark h1, body.theme-dark h2, body.theme-dark h3{color:#f1f5f9;}
+  body.theme-dark .recent{color:#cbd5e1;}
+</style>
+<script>
+(function(){
+  function applyTheme(){
+    var t = localStorage.getItem('wj_theme') || 'dark';
+    document.body.classList.remove('theme-dark','theme-light');
+    document.body.classList.add('theme-' + t);
+    var btn = document.getElementById('theme-tg');
+    if (btn) btn.textContent = (t === 'dark') ? '☀️' : '🌙';
+  }
+  var ttg = document.getElementById('theme-tg');
+  if (ttg) ttg.addEventListener('click', function(){
+    var cur = localStorage.getItem('wj_theme') || 'dark';
+    localStorage.setItem('wj_theme', cur === 'dark' ? 'light' : 'dark');
+    applyTheme();
+  });
+  applyTheme();
+})();
+</script>

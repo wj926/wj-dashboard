@@ -305,6 +305,33 @@
     .em-grid.m-detail .em-focus,.em-grid.m-detail .em-panel{overflow-x:hidden;}
     .draft-edit{min-height:150px;}
   }
+  /* ===== 진짜 다크모드(theme-dark): 카드도 어둡게 + 글씨 흰색. 토글로 켬 ===== */
+  body.theme-dark .em-card{background:#151d2b;box-shadow:0 6px 22px rgba(0,0,0,0.5);}
+  body.theme-dark .ef-sub,
+  body.theme-dark .qsender,
+  body.theme-dark .draft-text{color:#f1f5f9;}
+  body.theme-dark .ef-from,
+  body.theme-dark .ef-body,
+  body.theme-dark .draft-to,
+  body.theme-dark .dre-msg,
+  body.theme-dark .dre-note,
+  body.theme-dark .qsub,
+  body.theme-dark .qtime,
+  body.theme-dark .when,
+  body.theme-dark .em,
+  body.theme-dark .qreasons{color:#cbd5e1;}
+  /* 메일 본문은 원본 HTML(흰 종이 전제)이라 다크여도 흰 종이로 둬야 안 깨진다 */
+  body.theme-dark .ef-body{background:#fff;color:#15191f;border-radius:10px;padding:16px 18px;margin-top:4px;}
+  body.theme-dark .draft-edit,
+  body.theme-dark .persona-edit,
+  body.theme-dark .persona-sig,
+  body.theme-dark .q-search,
+  body.theme-dark .q-sort{background:#0e1626;color:#e2e8f0;border-color:#33415c;}
+  body.theme-dark .qitem:hover{background:#1b2740;}
+  body.theme-dark .qitem.on{background:#22304d;border-color:#33415c;}
+  body.theme-dark .ef-body table,
+  body.theme-dark .ef-body td,
+  body.theme-dark .ef-body th{border-color:#33415c;}
 </style>
 </head>
 <body>
